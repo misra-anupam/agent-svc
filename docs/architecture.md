@@ -40,6 +40,6 @@ the stream starts).
 ## Extras
 
 Heavy dependencies live in uv extras (`litellm`, `langgraph`,
-`mcp`, `otel`, `mlflow`, `mlflow_genai`, `langfuse`, `langsmith`, `presidio`, `guardrails_ai`).
+`mcp`, `mlflow`, `mlflow_genai`, `presidio`, `guardrails_ai`).
 They resolve together in one lock; CI also proves the orchestrator extra alone.
 `llm-guard` has no extra: its pins conflict with the lock.

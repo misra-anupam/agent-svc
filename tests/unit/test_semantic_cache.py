@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import fakeredis
 from tests.unit.test_cached_runner import CountingRunner, req
 
 from agent_svc.adapters.cache.cached_runner import CachedRunner
 from agent_svc.adapters.cache.semantic import SemanticIndex
-from agent_svc.adapters.cache.stores import InMemoryCache
+from agent_svc.adapters.cache.stores import RedisCache
 from agent_svc.config.settings import CacheSettings
 
 # axis 0 = "refund", axis 1 = "shipping"; near-duplicates share a direction
@@ -33,9 +34,14 @@ def make(
     threshold: float = 0.95, scope: str = "user"
 ) -> tuple[CachedRunner, CountingRunner, StubEmbedder]:
     emb, inner = StubEmbedder(), CountingRunner()
-    s = CacheSettings(provider="inmemory", semantic=True, semantic_threshold=threshold, scope=scope)  # type: ignore[arg-type]
+    s = CacheSettings(provider="redis", semantic=True, semantic_threshold=threshold, scope=scope)  # type: ignore[arg-type]
     return (
-        CachedRunner(inner, InMemoryCache(), s, SemanticIndex(emb, threshold=threshold)),
+        CachedRunner(
+            inner,
+            RedisCache(fakeredis.FakeAsyncRedis()),
+            s,
+            SemanticIndex(emb, threshold=threshold),
+        ),
         inner,
         emb,
     )

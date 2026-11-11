@@ -12,7 +12,7 @@ class Span(Protocol):
 
 
 class Tracer(Protocol):
-    """Backend-neutral tracing. Implementations: otel, mlflow, langfuse, noop."""
+    """Backend-neutral tracing. Implementation: mlflow."""
 
     def start_span(
         self, name: str, *, parent: Span | None = None, attributes: dict[str, Any] | None = None

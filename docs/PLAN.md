@@ -227,3 +227,10 @@ Tasks:
 
 ## Scope reduction (2026-11-11)
 The ADK, deepagents, MAF and CrewAI orchestrators and the `adk_eval` evaluator were removed to keep the template small for training. LangGraph and `echo` remain; the ports and registry make re-adding another framework a one-adapter change. Earlier phase notes above describe them as built.
+
+### Second scope reduction (2026-11-11)
+Removed: in-memory cache and in-memory rate limiter/budget/gate (Redis only), file and LangSmith prompt stores
+(MLflow only), `local` and LangSmith evaluators (`mlflow_genai` only), and the noop, OpenTelemetry and Langfuse
+tracers plus their compose profiles and extras (MLflow only; tracing is always on). Kept: the `echo` orchestrator
+and `langchain_bridge.py`. `Idempotency-Key` now needs Redis. In-memory *memory* stores and the in-memory run
+buffer remain. Compose now always starts MLflow.

@@ -11,7 +11,7 @@ import structlog
 from agent_svc.adapters import registries as reg
 from agent_svc.adapters.cache.cached_runner import CachedRunner
 from agent_svc.adapters.cache.semantic import SemanticIndex
-from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
+from agent_svc.adapters.cache.stores import RedisCache
 from agent_svc.adapters.guardrails.guarded_runner import GuardedRunner
 from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.infra.postgres import PostgresResource
@@ -202,7 +202,7 @@ class Container:
         )
 
         self.run_buffer = reg.run_buffers.create(s.app.run_buffer, s, infra)
-        self.kv = RedisCache(redis, "kv") if redis is not None else InMemoryCache()
+        self.kv = RedisCache(redis, "kv") if redis is not None else None  # no redis: no idempotency
 
     async def stop(self) -> None:
         if self._guard_policy is not None:

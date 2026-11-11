@@ -1,6 +1,6 @@
 """``agent-svc-eval``: replay the golden dataset through the service stack and gate on thresholds.
 
-    uv run agent-svc-eval                       # scripted model (no API key), local scorer
+    uv run agent-svc-eval                       # scripted model (no API key), MLflow GenAI scorer
     uv run agent-svc-eval --evaluator mlflow_genai
     uv run agent-svc-eval --real --exclude-tags simulate-only    # your configured model
 
@@ -58,7 +58,10 @@ def _configure(
     settings.redis.enabled = settings.postgres.enabled = False
     settings.ratelimit.provider = "none"
     settings.auth.enabled = False
-    settings.tracing.provider = "none"
+    if not settings.tracing.mlflow_tracking_uri.startswith(("sqlite", "file")):
+        settings.tracing.mlflow_tracking_uri = settings.evaluation.mlflow_tracking_uri or (
+            "sqlite:///evals/.mlflow/mlflow.db"
+        )
     settings.mcp.servers = []
     settings.memory.thread_provider = settings.memory.user_provider = "none"
     settings.memory.long_term_provider = "none"

@@ -3,17 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from agent_svc.adapters.llm.fake import FakeLLM
-from agent_svc.adapters.prompts.file import FilePromptStore
+from agent_svc.adapters.prompts.mlflow import MlflowPromptStore
 
 
 async def test_system_prompt_comes_from_the_store_and_agent_info_reports_it(  # type: ignore[no-untyped-def]
     settings, make_client, tmp_path: Path
 ) -> None:
-    store = FilePromptStore(tmp_path)
+    uri = f"sqlite:///{tmp_path}/m.db"
+    store = MlflowPromptStore(uri)
     await store.register("system", "You are a pirate.")
     await store.register("system", "You are a very formal butler.")
     await store.set_alias("system", "prod", "2")
-    settings.prompts.path, settings.prompts.ref = str(tmp_path), "system@prod"
+    settings.prompts.mlflow_tracking_uri, settings.prompts.ref = uri, "system@prod"
     primary = FakeLLM("fake/primary", reply="ok")
     async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}) as c:
         info = (await c.get("/v1/agent")).json()
@@ -29,7 +30,8 @@ async def test_missing_prompt_fails_startup(settings, make_client, tmp_path: Pat
 
     from agent_svc.domain.exceptions import NotFoundError
 
-    settings.prompts.path, settings.prompts.ref = str(tmp_path), "nope@prod"
+    settings.prompts.mlflow_tracking_uri = f"sqlite:///{tmp_path}/m.db"
+    settings.prompts.ref = "nope@prod"
     with pytest.raises(NotFoundError):
         async with make_client():
             pass

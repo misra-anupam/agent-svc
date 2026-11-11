@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from agent_svc.domain.models import AgentRequest, Message, Principal
 
@@ -24,3 +25,34 @@ def parse_sse(body: str) -> list[tuple[str, dict[str, object]]]:
         fields = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
         out.append((fields["event"], json.loads(fields["data"])))
     return out
+
+
+class RecordingTracer:
+    """Recording tracer used to assert the span tree independent of any backend."""
+
+    def __init__(self) -> None:
+        self.spans: list[RecordingTracer.S] = []
+
+    class S:
+        def __init__(self, name: str, parent: Any, attrs: dict[str, Any]) -> None:
+            self.name, self.parent, self.attrs = name, parent, dict(attrs)
+            self.ended, self.error, self.trace_id = False, None, "abc123"
+
+        def set_attribute(self, k: str, v: Any) -> None:
+            self.attrs[k] = v
+
+        def record_error(self, exc: BaseException) -> None:
+            self.error = str(exc)
+
+        def end(self) -> None:
+            self.ended = True
+
+    def start_span(
+        self, name: str, *, parent: Any = None, attributes: Any = None
+    ) -> RecordingTracer.S:
+        s = RecordingTracer.S(name, parent, attributes or {})
+        self.spans.append(s)
+        return s
+
+    async def flush(self) -> None: ...
+    async def shutdown(self) -> None: ...

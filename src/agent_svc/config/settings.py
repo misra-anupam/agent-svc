@@ -71,43 +71,31 @@ class ToolsSettings(BaseModel):
 
 
 class TracingSettings(BaseModel):
-    provider: Literal["none", "otel", "mlflow", "langfuse"] = "none"
+    provider: Literal["mlflow"] = "mlflow"
     service_name: str = "agent-svc"
     # Prompts/answers are NOT recorded unless explicitly enabled (privacy / OWASP LLM02).
     capture_content: bool = False
-    # otel
-    otlp_endpoint: str | None = None  # e.g. http://otel-collector:4318
-    otlp_headers: dict[str, str] = Field(default_factory=dict)
-    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
-    # mlflow
-    mlflow_tracking_uri: str | None = None
+    mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment: str = "agent-svc"
-    # langfuse
-    langfuse_host: str | None = None
-    langfuse_public_key: SecretStr | None = None
-    langfuse_secret_key: SecretStr | None = None
 
 
 class PromptStoreSettings(BaseModel):
-    provider: Literal["file", "mlflow", "langsmith"] = "file"
-    path: str = "prompts"  # file store root: <path>/<name>/<version>.txt + aliases.json
+    provider: Literal["mlflow"] = "mlflow"
     # Load the agent's system prompt from the store at startup: "name@alias" or "name:version"
     # (or just "name" for the latest). Empty keeps ``orchestrator.system_prompt``.
     ref: str = ""
     cache_ttl_seconds: float = 60.0
-    mlflow_tracking_uri: str = ""
-    langsmith_api_key: SecretStr | None = None
+    mlflow_tracking_uri: str = "http://localhost:5000"
 
 
 class EvalSettings(BaseModel):
-    provider: Literal["local", "mlflow_genai", "langsmith"] = "local"
+    provider: Literal["mlflow_genai"] = "mlflow_genai"
     golden_dir: str = "evals/golden"
     thresholds_file: str = "evals/golden/thresholds.yaml"
     mlflow_tracking_uri: str = ""  # empty: a local sqlite file under evals/.mlflow
     mlflow_experiment: str = "agent-svc-golden"
     # mlflow_genai: also run an LLM judge (Correctness) with this model, e.g. "openai:/gpt-4o-mini"
     judge_model: str = ""
-    langsmith_upload: bool = False  # True sends results to LangSmith (needs LANGSMITH_API_KEY)
 
 
 class HttpRailSettings(BaseModel):
@@ -187,10 +175,9 @@ class MemorySettings(BaseModel):
 
 
 class CacheSettings(BaseModel):
-    provider: Literal["none", "inmemory", "redis"] = "none"
+    provider: Literal["none", "redis"] = "none"
     ttl_seconds: int = 3_600
     scope: Literal["user", "tenant", "global"] = "user"  # who may share a cached answer
-    max_entries: int = 1_000  # inmemory only
     # Semantic cache: also reuse answers to *similar* questions (embedding cosine >= threshold).
     # Off by default: similar is not identical, so keep the threshold high. In-process index.
     semantic: bool = False
@@ -206,7 +193,7 @@ class TierLimit(BaseModel):
 
 
 class RateLimitSettings(BaseModel):
-    provider: Literal["none", "redis", "inmemory"] = "none"
+    provider: Literal["none", "redis"] = "none"
     mode: Literal["reject", "throttle"] = "reject"
     max_throttle_delay_ms: int = 2_000
     fail_open: bool = True

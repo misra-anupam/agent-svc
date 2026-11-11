@@ -1,16 +1,11 @@
-"""Contract tests: every backend of a port must behave identically (in-memory vs Redis)."""
+"""Contract tests: every backend of a port behaves identically (Redis; run buffer has a twin)."""
 
 import asyncio
 
 import fakeredis
 import pytest
 
-from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
-from agent_svc.adapters.ratelimit.memory import (
-    InMemoryConcurrencyGate,
-    InMemoryRateLimiter,
-    InMemoryTokenBudget,
-)
+from agent_svc.adapters.cache.stores import RedisCache
 from agent_svc.adapters.ratelimit.redis import (
     RedisConcurrencyGate,
     RedisRateLimiter,
@@ -19,24 +14,17 @@ from agent_svc.adapters.ratelimit.redis import (
 from agent_svc.adapters.runs.buffer import InMemoryRunBuffer, RedisRunBuffer
 
 
-@pytest.fixture(params=["inmemory", "redis"])
-def backend(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
+@pytest.fixture
+def backend():  # type: ignore[no-untyped-def]
     r = fakeredis.FakeAsyncRedis()
+    return (RedisRateLimiter(r), RedisTokenBudget(r), RedisConcurrencyGate(r), RedisCache(r))
+
+
+@pytest.fixture(params=["inmemory", "redis"])
+def buffer(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
     if request.param == "inmemory":
-        return (
-            InMemoryRateLimiter(),
-            InMemoryTokenBudget(),
-            InMemoryConcurrencyGate(),
-            InMemoryCache(),
-            InMemoryRunBuffer(),
-        )
-    return (
-        RedisRateLimiter(r),
-        RedisTokenBudget(r),
-        RedisConcurrencyGate(r),
-        RedisCache(r),
-        RedisRunBuffer(r),
-    )
+        return InMemoryRunBuffer()
+    return RedisRunBuffer(fakeredis.FakeAsyncRedis())
 
 
 async def test_token_bucket_burst_then_deny_then_refill(backend) -> None:  # type: ignore[no-untyped-def]
@@ -91,8 +79,8 @@ async def test_cache_roundtrip_ttl_and_set_if_absent(backend) -> None:  # type: 
     assert await cache.get("short") is None
 
 
-async def test_run_buffer_append_read_finish_owner(backend) -> None:  # type: ignore[no-untyped-def]
-    buf = backend[4]
+async def test_run_buffer_append_read_finish_owner(buffer) -> None:  # type: ignore[no-untyped-def]
+    buf = buffer
     await buf.start("r1", "alice")
     assert await buf.owner("r1") == "alice" and await buf.owner("nope") is None
     await buf.append("r1", b"f1")
@@ -105,8 +93,8 @@ async def test_run_buffer_append_read_finish_owner(backend) -> None:  # type: ig
     assert await buf.read("r1", 2, 0.05) == ([], True)
 
 
-async def test_run_buffer_read_wakes_on_new_frame(backend) -> None:  # type: ignore[no-untyped-def]
-    buf = backend[4]
+async def test_run_buffer_read_wakes_on_new_frame(buffer) -> None:  # type: ignore[no-untyped-def]
+    buf = buffer
     await buf.start("r2", "u")
 
     async def writer() -> None:

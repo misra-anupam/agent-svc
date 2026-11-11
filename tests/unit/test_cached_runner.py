@@ -2,8 +2,10 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
+import fakeredis
+
 from agent_svc.adapters.cache.cached_runner import CachedRunner
-from agent_svc.adapters.cache.stores import InMemoryCache
+from agent_svc.adapters.cache.stores import RedisCache
 from agent_svc.config.settings import CacheSettings
 from agent_svc.domain.exceptions import UpstreamError
 from agent_svc.domain.models import (
@@ -55,7 +57,9 @@ async def run(r: CachedRunner, request: AgentRequest) -> list[AgentEvent]:
 
 
 def make(inner: CountingRunner, scope: str = "user") -> CachedRunner:
-    return CachedRunner(inner, InMemoryCache(), CacheSettings(provider="inmemory", scope=scope))  # type: ignore[arg-type]
+    return CachedRunner(
+        inner, RedisCache(fakeredis.FakeAsyncRedis()), CacheSettings(provider="redis", scope=scope)
+    )  # type: ignore[arg-type]
 
 
 async def test_second_identical_request_is_served_from_cache() -> None:
@@ -118,11 +122,11 @@ async def test_single_flight_coalesces_concurrent_identical_requests() -> None:
 
 
 async def test_cache_outage_degrades_to_miss() -> None:
-    class Broken(InMemoryCache):
+    class Broken(RedisCache):
         async def get(self, key: str) -> bytes | None:
             raise ConnectionError("down")
 
     inner = CountingRunner()
-    c = CachedRunner(inner, Broken(), CacheSettings(provider="inmemory"))
+    c = CachedRunner(inner, Broken(fakeredis.FakeAsyncRedis()), CacheSettings(provider="redis"))
     events = await run(c, req())
     assert isinstance(events[-1], RunCompleted) and inner.calls == 1

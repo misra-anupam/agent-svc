@@ -72,8 +72,7 @@ def get_memory(request: Request) -> MemoryFacade:
     return mem
 
 
-def get_kv(request: Request) -> Cache:
+def get_kv(request: Request) -> Cache | None:
+    """Redis-backed key/value store; ``None`` when Redis is off (no idempotency)."""
     kv: Cache | None = request.app.state.container.kv
-    if kv is None:
-        raise UnavailableError("service starting")
     return kv

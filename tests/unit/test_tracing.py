@@ -3,15 +3,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
-from tests.helpers import make_request
+from tests.helpers import RecordingTracer, make_request
 
-from agent_svc.adapters.tracing.langfuse import LangfuseTracer
 from agent_svc.adapters.tracing.mlflow import MlflowTracer
-from agent_svc.adapters.tracing.otel import OtelTracer
 from agent_svc.adapters.tracing.traced_runner import TracedRunner
 from agent_svc.config.settings import TracingSettings
 from agent_svc.domain.exceptions import UpstreamError
@@ -28,35 +22,6 @@ from agent_svc.domain.models import (
     Usage,
     UsageReported,
 )
-
-
-class Rec:
-    """Recording tracer used to assert the span tree independent of any backend."""
-
-    def __init__(self) -> None:
-        self.spans: list[Rec.S] = []
-
-    class S:
-        def __init__(self, name: str, parent: Any, attrs: dict[str, Any]) -> None:
-            self.name, self.parent, self.attrs = name, parent, dict(attrs)
-            self.ended, self.error, self.trace_id = False, None, "abc123"
-
-        def set_attribute(self, k: str, v: Any) -> None:
-            self.attrs[k] = v
-
-        def record_error(self, exc: BaseException) -> None:
-            self.error = str(exc)
-
-        def end(self) -> None:
-            self.ended = True
-
-    def start_span(self, name: str, *, parent: Any = None, attributes: Any = None) -> "Rec.S":
-        s = Rec.S(name, parent, attributes or {})
-        self.spans.append(s)
-        return s
-
-    async def flush(self) -> None: ...
-    async def shutdown(self) -> None: ...
 
 
 class Scripted:
@@ -99,7 +64,7 @@ async def drain(runner: TracedRunner) -> None:
 
 
 async def test_span_tree_nesting_usage_and_totals() -> None:
-    rec = Rec()
+    rec = RecordingTracer()
     await drain(TracedRunner(Scripted(events()), rec, TracingSettings()))  # type: ignore[arg-type]
     by = {s.name: s for s in rec.spans}
     root = by["agent.run"]
@@ -111,18 +76,18 @@ async def test_span_tree_nesting_usage_and_totals() -> None:
 
 
 async def test_content_is_not_captured_by_default_but_can_be_enabled() -> None:
-    rec = Rec()
+    rec = RecordingTracer()
     await drain(TracedRunner(Scripted(events()), rec, TracingSettings()))  # type: ignore[arg-type]
     blob = str([s.attrs for s in rec.spans])
     assert "secret" not in blob and "the answer" not in blob and "hello world" not in blob
-    rec2 = Rec()
+    rec2 = RecordingTracer()
     await drain(TracedRunner(Scripted(events()), rec2, TracingSettings(capture_content=True)))  # type: ignore[arg-type]
     blob2 = str([s.attrs for s in rec2.spans])
     assert "the answer" in blob2 and "top secret" in blob2
 
 
 async def test_failures_mark_spans_as_errors() -> None:
-    rec = Rec()
+    rec = RecordingTracer()
     await drain(TracedRunner(Scripted(events(fail_step=True, error=True)), rec, TracingSettings()))  # type: ignore[arg-type]
     by = {s.name: s for s in rec.spans}
     assert by["tool:search"].error and by["agent.run"].error == "boom: bad"
@@ -130,13 +95,13 @@ async def test_failures_mark_spans_as_errors() -> None:
 
 
 async def test_exceptions_and_cancellation_close_every_span() -> None:
-    rec = Rec()
+    rec = RecordingTracer()
     evs = events()[:3]  # steps a and b started, never finished
     with pytest.raises(UpstreamError):
         await drain(TracedRunner(Scripted(evs, boom=UpstreamError("x")), rec, TracingSettings()))  # type: ignore[arg-type]
     assert all(s.ended for s in rec.spans) and rec.spans[0].error == "x"
 
-    rec2 = Rec()
+    rec2 = RecordingTracer()
 
     class Hang:
         async def stream(self, request: AgentRequest):  # type: ignore[no-untyped-def]
@@ -149,59 +114,6 @@ async def test_exceptions_and_cancellation_close_every_span() -> None:
     with pytest.raises(asyncio.CancelledError):
         await t
     assert rec2.spans[0].ended
-
-
-def test_otel_adapter_exports_parented_spans_with_error_status() -> None:
-    exp = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exp))
-    tr = OtelTracer(provider, "svc")
-    root = tr.start_span("agent.run", attributes={"a": 1, "obj": {"x": 1}})
-    child = tr.start_span("tool:x", parent=root, attributes={"step.kind": "tool"})
-    child.record_error(RuntimeError("bad"))
-    child.end()
-    root.end()
-    spans = {s.name: s for s in exp.get_finished_spans()}
-    assert spans["tool:x"].parent.span_id == spans["agent.run"].context.span_id  # type: ignore[union-attr]
-    assert spans["tool:x"].context.trace_id == spans["agent.run"].context.trace_id
-    assert spans["tool:x"].status.status_code is StatusCode.ERROR
-    assert spans["agent.run"].attributes["obj"] == "{'x': 1}" and root.trace_id == child.trace_id
-
-
-def test_langfuse_adapter_maps_kinds_and_usage() -> None:
-    from langfuse import Langfuse
-
-    exp = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exp))
-    client = Langfuse(
-        public_key="pk-lf-test",
-        secret_key="sk-lf-test",
-        base_url="http://localhost:9",
-        tracer_provider=provider,
-        tracing_enabled=True,
-    )
-    tr = LangfuseTracer(client)
-    root = tr.start_span("agent.run", attributes={"step.kind": "agent", "tenant.id": "acme"})
-    llm = tr.start_span(
-        "llm:m/x",
-        parent=root,
-        attributes={
-            "step.kind": "llm",
-            "gen_ai.request.model": "m/x",
-            "gen_ai.usage.input_tokens": 10,
-            "gen_ai.usage.output_tokens": 4,
-            "cost_usd": 0.002,
-        },
-    )
-    llm.end()
-    root.end()
-    names = {s.name: s for s in exp.get_finished_spans()}
-    assert {"agent.run", "llm:m/x"} <= set(names)
-    assert names["llm:m/x"].parent.span_id == names["agent.run"].context.span_id  # type: ignore[union-attr]
-    attrs = dict(names["llm:m/x"].attributes or {})
-    assert any("model" in k and v == "m/x" for k, v in attrs.items())
-    assert root.trace_id and root.trace_id == llm.trace_id
 
 
 def test_mlflow_adapter_calls_sdk_with_types_and_parent() -> None:

@@ -10,7 +10,12 @@ from agent_svc.api.deps import get_chat_service, get_kv, get_principal, get_supe
 from agent_svc.api.schemas.chat import ChatRequest, SseEvent
 from agent_svc.api.sse import RunSupervisor
 from agent_svc.application.chat_service import ChatService
-from agent_svc.domain.exceptions import BadRequestError, NotFoundError, PayloadTooLargeError
+from agent_svc.domain.exceptions import (
+    BadRequestError,
+    NotFoundError,
+    PayloadTooLargeError,
+    UnavailableError,
+)
 from agent_svc.domain.models import Message, Principal
 from agent_svc.domain.ports import Cache
 
@@ -49,7 +54,7 @@ async def chat(
     principal: Annotated[Principal, Depends(get_principal)],
     service: Annotated[ChatService, Depends(get_chat_service)],
     supervisor: Annotated[RunSupervisor, Depends(get_supervisor)],
-    kv: Annotated[Cache, Depends(get_kv)],
+    kv: Annotated[Cache | None, Depends(get_kv)],
     idempotency_key: Annotated[str | None, Header(pattern=_IDEM)] = None,
     cache_control: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
@@ -63,9 +68,14 @@ async def chat(
     new = [Message(m.role, m.content) for m in body.messages]
 
     # Idempotent replay happens *before* admission so retries never consume quota.
-    idem_key = f"idem:{principal.tenant}:{principal.subject}:{thread_id}:{idempotency_key}"
+    store: Cache | None = None
     if idempotency_key:
-        prior = await kv.get(idem_key)
+        if kv is None:
+            raise UnavailableError("Idempotency-Key needs Redis, which is not enabled")
+        store = kv
+    idem_key = f"idem:{principal.tenant}:{principal.subject}:{thread_id}:{idempotency_key}"
+    if store is not None:
+        prior = await store.get(idem_key)
         if prior:
             run_id = prior.decode()
             if await supervisor.owner(run_id) == principal.subject:
@@ -75,8 +85,10 @@ async def chat(
     try:
         metadata = {"no_cache": "no-cache" in (cache_control or "").lower()}
         areq = await service.prepare(thread_id, principal, new, metadata=metadata)
-        if idempotency_key and not await kv.set_if_absent(idem_key, areq.run_id.encode(), 3600):
-            prior = await kv.get(idem_key)  # lost a race with a concurrent identical request
+        if store is not None and not await store.set_if_absent(
+            idem_key, areq.run_id.encode(), 3600
+        ):
+            prior = await store.get(idem_key)  # lost a race with a concurrent identical request
             if prior and await supervisor.owner(prior.decode()) == principal.subject:
                 await service.release(admission)
                 return _stream(supervisor, prior.decode(), 0, cfg.sse_heartbeat_seconds)

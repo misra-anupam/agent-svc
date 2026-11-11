@@ -1,9 +1,8 @@
 import httpx
 import pytest
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from tests.helpers import RecordingTracer
 
 import agent_svc.adapters.registries as registries
-from agent_svc.adapters.tracing.otel import OtelTracer
 from agent_svc.config import Settings
 from agent_svc.container import Container
 from agent_svc.domain.exceptions import ConfigurationError
@@ -15,42 +14,29 @@ BODY = {"messages": [{"role": "user", "content": "hi"}]}
 async def test_request_produces_one_trace_with_run_step_and_llm_spans(
     settings: Settings, make_client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-
-    exp = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exp))
-    monkeypatch.setitem(
-        registries.tracers._factories, "otel", (lambda s: OtelTracer(provider, "svc"), None)
-    )
-    settings.tracing.provider = "otel"
+    rec = RecordingTracer()
+    monkeypatch.setitem(registries.tracers._factories, "mlflow", (lambda s: rec, None))
     async with make_client() as c:
         r = await c.post("/v1/threads/t/chat", json=BODY)
     assert r.status_code == 200
-    spans = exp.get_finished_spans()
-    names = {s.name for s in spans}
+    names = {s.name for s in rec.spans}
     assert (
         "agent.run" in names
         and "tool:calculator" in names
         and any(n.startswith("llm:") for n in names)
     )
-    assert len({s.context.trace_id for s in spans}) == 1  # single trace
-    root = next(s for s in spans if s.name == "agent.run")
-    assert root.attributes["agent.version"] == "1.0.0" and "input" not in root.attributes  # type: ignore[index]
+    assert all(s.ended for s in rec.spans)
+    root = next(s for s in rec.spans if s.name == "agent.run")
+    assert root.attrs["agent.version"] == "1.0.0" and "input" not in root.attrs
 
 
-async def test_selected_tracer_missing_config_fails_at_startup(settings: Settings) -> None:
-    settings.tracing.provider = "mlflow"  # no tracking uri
+async def test_missing_tracking_uri_fails_at_startup(settings: Settings) -> None:
+    settings.tracing.mlflow_tracking_uri = ""
     app = create_app(settings, Container(settings))
     with pytest.raises(ConfigurationError, match="MLFLOW_TRACKING_URI"):
         async with app.router.lifespan_context(app):
             pass
-    settings.tracing.provider = "langfuse"  # no keys
-    with pytest.raises(ConfigurationError, match="LANGFUSE_PUBLIC_KEY"):
-        async with create_app(settings, Container(settings)).router.lifespan_context(app):
-            pass
 
 
-async def test_default_is_noop_and_requests_work(client: httpx.AsyncClient) -> None:
+async def test_tracing_is_always_on_and_requests_work(client: httpx.AsyncClient) -> None:
     assert (await client.get("/v1/agent")).status_code == 200

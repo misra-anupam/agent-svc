@@ -40,16 +40,10 @@ dependencies = [
 guardrails-ai = [
     { name = "guardrails-ai" },
 ]
-langfuse = [
-    { name = "langfuse" },
-]
 langgraph = [
     { name = "langchain" },
     { name = "langchain-core" },
     { name = "langgraph" },
-]
-langsmith = [
-    { name = "langsmith" },
 ]
 litellm = [
     { name = "litellm", version = "1.106.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
@@ -63,10 +57,6 @@ mlflow = [
 ]
 mlflow-genai = [
     { name = "mlflow" },
-]
-otel = [
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
 ]
 presidio = [
     { name = "presidio-analyzer" },
@@ -97,15 +87,11 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "langchain", marker = "extra == 'langgraph'", specifier = ">=1.0" },
     { name = "langchain-core", marker = "extra == 'langgraph'", specifier = ">=0.3" },
-    { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=3.0" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=0.2" },
-    { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.4" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.50" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
     { name = "mlflow", marker = "extra == 'mlflow-genai'", specifier = ">=3.1" },
     { name = "mlflow-tracing", marker = "extra == 'mlflow'", specifier = ">=3.0" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.27" },
-    { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.27" },
     { name = "presidio-analyzer", marker = "extra == 'presidio'", specifier = ">=2.2" },
     { name = "presidio-anonymizer", marker = "extra == 'presidio'", specifier = ">=2.2" },
     { name = "prometheus-client", specifier = ">=0.20" },
@@ -118,7 +104,7 @@ requires-dist = [
     { name = "tenacity", specifier = ">=9.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
-provides-extras = ["litellm", "langgraph", "otel", "langfuse", "mlflow", "mcp", "presidio", "mlflow-genai", "langsmith", "guardrails-ai"]
+provides-extras = ["litellm", "langgraph", "mlflow", "mcp", "presidio", "mlflow-genai", "guardrails-ai"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -499,15 +485,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/b2/51899539b6ceeeb420d40ed3cd4b7a40519404f9baf3d4ac99dc413a834b/babel-2.18.0.tar.gz", hash = "sha256:b80b99a14bd085fcacfa15c9165f651fbb3406e66cc603abf11c5750937c992d", size = 9959554, upload-time = "2026-02-01T12:30:56.078Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl", hash = "sha256:e2b422b277c2b9a9630c1d7903c2a00d0830c409c59ac8cae9081c92f1aeba35", size = 10196845, upload-time = "2026-02-01T12:30:53.445Z" },
-]
-
-[[package]]
-name = "backoff"
-version = "2.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba", size = 17001, upload-time = "2022-10-05T19:19:32.061Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8", size = 15148, upload-time = "2022-10-05T19:19:30.546Z" },
 ]
 
 [[package]]
@@ -2623,26 +2600,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/be/db/7f9195371c824e706231365b4c6c85573b12c4375286e7471d6a488e8091/langchain_protocol-0.0.21.tar.gz", hash = "sha256:04b3e80852233a8db39b39d3ad2438d892531dc0ecd41459e857a139ee0e601c", size = 6344, upload-time = "2026-11-05T16:16:47.078Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3f/f6/25232abfce5cc696c21f7947e6ae11cc6b124e5099783408ff8552c545a3/langchain_protocol-0.0.21-py3-none-any.whl", hash = "sha256:7f42f9eae7c08bb9d74850057da50b5483970a3df91b7a8a5aadec6a3dfa4d12", size = 7418, upload-time = "2026-11-05T16:16:45.444Z" },
-]
-
-[[package]]
-name = "langfuse"
-version = "5.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "backoff" },
-    { name = "httpx" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "packaging" },
-    { name = "pydantic" },
-    { name = "typing-extensions" },
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/37/b3/65dbc94d809676053b65e89fda729ef7d8a1d13bbb89f2ab407639f631f2/langfuse-5.2.0.tar.gz", hash = "sha256:8cde9e91b44b53444906af9b37efa9c29c647a9f45f9f8435a638026cb3d4693", size = 383092, upload-time = "2026-11-05T09:53:48.439Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/48/715e2b612d5d20989e4a338c27d78bef43de327f2192c9b20421f5648868/langfuse-5.2.0-py3-none-any.whl", hash = "sha256:4763cbad358960f1036078a4c6e9f86f04690ea566541709c2c40aa1998e2b0f", size = 660151, upload-time = "2026-11-05T09:53:49.817Z" },
 ]
 
 [[package]]

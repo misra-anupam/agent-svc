@@ -1,31 +1,31 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 from agent_svc.adapters.prompts.cached import CachedPromptStore
-from agent_svc.adapters.prompts.file import FilePromptStore
-from agent_svc.adapters.prompts.langsmith import LangSmithPromptStore
+from agent_svc.adapters.prompts.mlflow import MlflowPromptStore
 from agent_svc.container import parse_prompt_ref
-from agent_svc.domain.exceptions import BadRequestError, ConfigurationError, NotFoundError
+from agent_svc.domain.exceptions import NotFoundError
 from agent_svc.domain.ports import PromptVersion
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> FilePromptStore:
-    return FilePromptStore(tmp_path)
+def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MlflowPromptStore:
+    """MLflow prompt registry on a throwaway sqlite file (offline, no server)."""
+    monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
+    return MlflowPromptStore(f"sqlite:///{tmp_path}/m.db")
 
 
-async def test_versions_increment_and_latest_is_default(store: FilePromptStore) -> None:
+async def test_versions_increment_and_latest_is_default(store: MlflowPromptStore) -> None:
     assert (await store.register("system", "v one")).version == "1"
     assert (await store.register("system", "v two")).version == "2"
     assert (await store.get("system")).template == "v two"
     assert (await store.get("system", version="1")).template == "v one"
 
 
-async def test_aliases_move_between_versions(store: FilePromptStore) -> None:
+async def test_aliases_move_between_versions(store: MlflowPromptStore) -> None:
     await store.register("system", "a")
     await store.register("system", "b")
     await store.set_alias("system", "prod", "1")
@@ -38,15 +38,7 @@ async def test_aliases_move_between_versions(store: FilePromptStore) -> None:
         await store.get("system", alias="staging")
 
 
-@pytest.mark.parametrize("bad", ["../etc/passwd", "a/b", "", ".hidden", "x" * 80, "a b"])
-async def test_path_traversal_and_odd_names_are_rejected(store: FilePromptStore, bad: str) -> None:
-    with pytest.raises(BadRequestError):
-        await store.register(bad, "x")
-    with pytest.raises(BadRequestError):
-        await store.get(bad)
-
-
-async def test_missing_prompt_is_not_found(store: FilePromptStore) -> None:
+async def test_missing_prompt_is_not_found(store: MlflowPromptStore) -> None:
     with pytest.raises(NotFoundError):
         await store.get("nope")
 
@@ -101,51 +93,3 @@ async def test_register_invalidates_that_prompt() -> None:
 )
 def test_prompt_ref_parsing(ref: str, expected: tuple[str, str | None, str | None]) -> None:
     assert parse_prompt_ref(ref) == expected
-
-
-# ---- MLflow (offline: sqlite tracking store, no server) --------------------------------------
-async def test_mlflow_prompt_registry_roundtrip(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    pytest.importorskip("mlflow")
-    monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
-    from agent_svc.adapters.prompts.mlflow import MlflowPromptStore
-
-    s = MlflowPromptStore(f"sqlite:///{tmp_path}/m.db")
-    assert (await s.register("system", "first")).version == "1"
-    await s.register("system", "second")
-    await s.set_alias("system", "prod", "1")
-    assert (await s.get("system", alias="prod")).template == "first"
-    assert (await s.get("system")).template == "second"
-    assert (await s.get("system", version="2")).version == "2"
-    with pytest.raises(NotFoundError):
-        await s.get("missing")
-
-
-# ---- LangSmith (stubbed client: the live service needs an account) ----------------------------
-class StubClient:
-    def __init__(self, template: object = "Be {tone}.") -> None:
-        self.template, self.idents = template, []
-
-    def pull_prompt_commit(self, ident: str) -> SimpleNamespace:
-        self.idents.append(ident)
-        return SimpleNamespace(commit_hash="abc123")
-
-    def pull_prompt(self, ident: str) -> SimpleNamespace:
-        return SimpleNamespace(template=self.template)
-
-
-async def test_langsmith_maps_alias_to_tag_and_commit_hash_to_version() -> None:
-    client = StubClient()
-    pv = await LangSmithPromptStore(client).get("system", alias="prod")
-    assert (
-        client.idents == ["system:prod"] and pv.version == "abc123" and pv.template == "Be {tone}."
-    )
-
-
-async def test_langsmith_rejects_non_string_prompts_and_alias_writes() -> None:
-    store = LangSmithPromptStore(StubClient(template=["chat", "messages"]))
-    with pytest.raises(ConfigurationError, match="plain string"):
-        await store.get("system")
-    with pytest.raises(ConfigurationError, match="commit tags"):
-        await store.set_alias("system", "prod", "abc")

@@ -2,7 +2,7 @@ COMPOSE ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compos
 PROFILES ?=
 .PHONY: test-integration install check lint types arch test run up docs docs-build docs-api new-adapter eval
 install:
-	uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow
+	uv sync --group dev --extra litellm --extra langgraph --extra mlflow --extra mlflow_genai
 lint:
 	uv run ruff check . && uv run ruff format --check .
 types:

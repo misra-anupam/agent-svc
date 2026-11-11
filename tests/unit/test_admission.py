@@ -1,11 +1,12 @@
 import time
 
+import fakeredis
 import pytest
 
-from agent_svc.adapters.ratelimit.memory import (
-    InMemoryConcurrencyGate,
-    InMemoryRateLimiter,
-    InMemoryTokenBudget,
+from agent_svc.adapters.ratelimit.redis import (
+    RedisConcurrencyGate,
+    RedisRateLimiter,
+    RedisTokenBudget,
 )
 from agent_svc.application.admission import AdmissionService
 from agent_svc.config.settings import RateLimitSettings, TierLimit
@@ -15,7 +16,7 @@ from agent_svc.domain.models import Principal, Usage
 
 def svc(**kw: object) -> AdmissionService:
     s = RateLimitSettings(
-        provider="inmemory",
+        provider="redis",
         tiers={
             "free": TierLimit(
                 requests_per_minute=60, burst=2, daily_token_budget=100, max_concurrent=1
@@ -30,11 +31,12 @@ def svc(**kw: object) -> AdmissionService:
         ip_daily_token_budget=150,
         **kw,  # type: ignore[arg-type]
     )
+    r = fakeredis.FakeAsyncRedis()
     return AdmissionService(
         s,
-        limiter=InMemoryRateLimiter(),
-        budget=InMemoryTokenBudget(),
-        gate=InMemoryConcurrencyGate(),
+        limiter=RedisRateLimiter(r),
+        budget=RedisTokenBudget(r),
+        gate=RedisConcurrencyGate(r),
     )
 
 

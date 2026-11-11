@@ -15,6 +15,20 @@ from agent_svc.config import Settings
 from agent_svc.container import Container
 from agent_svc.domain.models import ToolCall
 from agent_svc.main import create_app
+from tests.helpers import RecordingTracer
+
+
+@pytest.fixture(autouse=True)
+def _recording_tracer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MLflow is the only tracer; tests swap in a recorder unless the tracking URI is empty."""
+    from agent_svc.adapters.tracing import mlflow as mlflow_tracing
+
+    real = mlflow_tracing.build
+    monkeypatch.setitem(
+        registries.tracers._factories,
+        "mlflow",
+        (lambda s: real(s) if not s.tracing.mlflow_tracking_uri else RecordingTracer(), None),
+    )
 
 
 @pytest.fixture

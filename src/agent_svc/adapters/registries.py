@@ -56,17 +56,13 @@ guardrails.register("prompt_guard", "agent_svc.adapters.guardrails.http_rails:bu
 
 # Prompt stores: factory(settings) -> PromptStore
 prompt_stores: Registry[PromptStore] = Registry("prompts")
-prompt_stores.register("file", "agent_svc.adapters.prompts.file:build")
 prompt_stores.register("mlflow", "agent_svc.adapters.prompts.mlflow:build", extra="mlflow_genai")
-prompt_stores.register("langsmith", "agent_svc.adapters.prompts.langsmith:build", extra="langsmith")
 
 # Evaluators: factory(settings) -> Evaluator
 evaluators: Registry[Evaluator] = Registry("eval")
-evaluators.register("local", "agent_svc.adapters.eval.local:build")
 evaluators.register(
     "mlflow_genai", "agent_svc.adapters.eval.mlflow_genai:build", extra="mlflow_genai"
 )
-evaluators.register("langsmith", "agent_svc.adapters.eval.langsmith:build", extra="langsmith")
 
 
 def build_prompt_store(settings: Settings) -> PromptStore:
@@ -84,10 +80,7 @@ tool_sources.register("local", "agent_svc.adapters.tools.local:build")
 tool_sources.register("mcp", "agent_svc.adapters.tools.mcp:build", extra="mcp")
 
 tracers: Registry[Tracer] = Registry("tracing")
-tracers.register("none", "agent_svc.adapters.tracing.noop:build")
-tracers.register("otel", "agent_svc.adapters.tracing.otel:build", extra="otel")
 tracers.register("mlflow", "agent_svc.adapters.tracing.mlflow:build", extra="mlflow")
-tracers.register("langfuse", "agent_svc.adapters.tracing.langfuse:build", extra="langfuse")
 
 # --- state, protection, auth: factories take (settings, infra) ---------------------------------
 authenticators: Registry[Authenticator] = Registry("auth")
@@ -101,11 +94,9 @@ embedders.register(
 )
 
 limit_backends: Registry[fx.LimitBackend] = Registry("ratelimit")
-limit_backends.register("inmemory", fx.limits_inmemory)
 limit_backends.register("redis", fx.limits_redis)
 
 caches: Registry[Cache] = Registry("cache")
-caches.register("inmemory", fx.cache_inmemory)
 caches.register("redis", fx.cache_redis)
 
 thread_memories: Registry[ThreadMemory] = Registry("thread_memory")

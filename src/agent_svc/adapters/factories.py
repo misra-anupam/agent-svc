@@ -4,16 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
+from agent_svc.adapters.cache.stores import RedisCache
 from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.memory.long_term import InMemoryLongTermMemory, PgVectorLongTermMemory
 from agent_svc.adapters.memory.thread import InMemoryThreadMemory, RedisThreadMemory
 from agent_svc.adapters.memory.user import InMemoryUserMemory, PostgresUserMemory
-from agent_svc.adapters.ratelimit.memory import (
-    InMemoryConcurrencyGate,
-    InMemoryRateLimiter,
-    InMemoryTokenBudget,
-)
 from agent_svc.adapters.ratelimit.redis import (
     RedisConcurrencyGate,
     RedisRateLimiter,
@@ -47,19 +42,11 @@ class LimitBackend:
     gate: ConcurrencyGate
 
 
-def limits_inmemory(_s: Settings, _i: Infra) -> LimitBackend:
-    return LimitBackend(InMemoryRateLimiter(), InMemoryTokenBudget(), InMemoryConcurrencyGate())
-
-
 def limits_redis(_s: Settings, i: Infra) -> LimitBackend:
     _need(i.redis, "redis", "AGENT_RATELIMIT__PROVIDER=redis")
     return LimitBackend(
         RedisRateLimiter(i.redis), RedisTokenBudget(i.redis), RedisConcurrencyGate(i.redis)
     )
-
-
-def cache_inmemory(s: Settings, _i: Infra) -> Cache:
-    return InMemoryCache(s.cache.max_entries)
 
 
 def cache_redis(_s: Settings, i: Infra) -> Cache:

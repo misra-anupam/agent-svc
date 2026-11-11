@@ -50,9 +50,13 @@ class MlflowPromptStore:
         return await anyio.to_thread.run_sync(self._register, name, template)
 
     async def set_alias(self, name: str, alias: str, version: str) -> None:
-        await anyio.to_thread.run_sync(
-            lambda: self._genai.set_prompt_alias(name, alias=alias, version=int(version))
-        )
+        def run() -> None:
+            try:
+                self._genai.set_prompt_alias(name, alias=alias, version=int(version))
+            except Exception as exc:  # unknown prompt or version
+                raise NotFoundError(f"prompt {name} version {version} not found: {exc}") from exc
+
+        await anyio.to_thread.run_sync(run)
 
 
 def build(settings: Settings) -> MlflowPromptStore:

@@ -185,7 +185,7 @@ GATE = {"answer_match": Threshold(min=1.0), "tool_trajectory": Threshold(min=1.0
 
 
 def evaluator_params() -> list[str]:
-    names = ["local", "langsmith", "mlflow_genai"]
+    names = ["mlflow_genai"]
     return names
 
 
@@ -222,10 +222,16 @@ async def test_mlflow_run_is_tagged_with_agent_version_and_gate_result(settings:
 
 
 # ---- the CI gate itself: exit code follows the thresholds -------------------------------------
+@pytest.fixture(autouse=True)
+def _sqlite_mlflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
+    monkeypatch.setenv("AGENT_EVALUATION__MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path}/ml.db")
+
+
 def cli_args(tmp: Path, thresholds: Path | None = None, **kw: object) -> argparse.Namespace:
     base = dict(
         simulate=True,
-        evaluator="local",
+        evaluator="mlflow_genai",
         orchestrator=None,
         dataset=None,
         thresholds=str(thresholds) if thresholds else None,

@@ -4,8 +4,7 @@
 [`evals/golden/README.md`](https://github.com/misra-anupam/agent-svc/blob/main/evals/golden/README.md).
 
 ```bash
-make eval                                            # scripted model, local scorer, no API key
-make eval EVAL_ARGS="--evaluator mlflow_genai"       # logs a tagged MLflow run
+make eval                                            # scripted model, MLflow GenAI scorer (sqlite), no API key
 uv run agent-svc-eval --real --exclude-tags simulate-only   # your configured model
 ```
 
@@ -33,4 +32,4 @@ A thresholded metric that cannot be computed fails the gate rather than being sk
 ## Prompts
 
 `AGENT_PROMPTS__REF=system@prod` loads the system prompt from the store at startup; `/v1/agent`
-reports the version in use. File store layout: `prompts/<name>/<n>.txt` plus `aliases.json`.
+reports the version in use. Prompts live in the MLflow Prompt Registry (`AGENT_PROMPTS__MLFLOW_TRACKING_URI`).
