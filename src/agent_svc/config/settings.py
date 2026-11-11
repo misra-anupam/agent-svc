@@ -98,13 +98,64 @@ class EvalSettings(BaseModel):
     golden_dir: str = "evals/golden"
 
 
+class HttpRailSettings(BaseModel):
+    """A guardrail served by a sidecar over HTTP (Llama Guard, Prompt Guard, NeMo Guardrails)."""
+
+    url: str = ""
+    api_key: SecretStr | None = None
+    model: str = ""
+    timeout_seconds: float = 5.0
+    threshold: float = 0.5  # classifier score at/above which the rail blocks
+    config_id: str = ""  # NeMo Guardrails config
+    refusal_markers: list[str] = ["I'm sorry, I can't respond to that."]  # NeMo: bot refusal text
+
+
+class TierPolicy(BaseModel):
+    """Per-tier override. ``None`` lists inherit the global ``enabled_*`` selection."""
+
+    enabled: bool = True
+    input: list[str] | None = None
+    output: list[str] | None = None
+
+
 class GuardrailSettings(BaseModel):
+    enabled: bool = True
     enabled_input: list[
         Literal["builtin", "presidio", "prompt_guard", "guardrails_ai", "nemo", "llm_guard"]
     ] = ["builtin"]
     enabled_output: list[
         Literal["builtin", "presidio", "llama_guard", "guardrails_ai", "nemo", "llm_guard"]
     ] = ["builtin"]
+    # A rail that errors or times out: "closed" blocks the request, "open" lets it through.
+    fail_mode: Literal["closed", "open"] = "closed"
+    max_input_chars: int = 8_000
+    rail_timeout_seconds: float = 10.0
+    # "buffer": hold the answer until the output rails pass (nothing unsafe ever leaves).
+    # "stream": pass deltas through and re-check every ``stream_check_chars`` (lower latency,
+    # but a prefix may already be sent when a rail blocks mid-answer).
+    output_mode: Literal["buffer", "stream"] = "buffer"
+    stream_check_chars: int = 400
+    tier_policy: dict[str, TierPolicy] = Field(default_factory=dict)
+    # presidio
+    presidio_model: str = "en_core_web_sm"
+    presidio_entities: list[str] = [
+        "EMAIL_ADDRESS",
+        "CREDIT_CARD",
+        "PHONE_NUMBER",
+        "US_SSN",
+        "IBAN_CODE",
+        "IP_ADDRESS",
+    ]
+    presidio_threshold: float = 0.5
+    presidio_action: Literal["redact", "block"] = "redact"
+    # guardrails_ai: "module:attr" factories returning a Validator (Hub validators work too)
+    guardrails_ai_validators: list[str] = []
+    # llm_guard (archived upstream; kept for existing users): scanner class names
+    llm_guard_input_scanners: list[str] = ["PromptInjection"]
+    llm_guard_output_scanners: list[str] = ["Sensitive"]
+    llama_guard: HttpRailSettings = Field(default_factory=HttpRailSettings)
+    prompt_guard: HttpRailSettings = Field(default_factory=HttpRailSettings)
+    nemo: HttpRailSettings = Field(default_factory=HttpRailSettings)
 
 
 class MemorySettings(BaseModel):

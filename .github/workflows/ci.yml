@@ -6,7 +6,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow --extra adk --extra deepagents --extra maf --extra crewai --extra mcp
+      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow --extra adk --extra deepagents --extra maf --extra crewai --extra mcp --extra presidio --extra guardrails_ai
+      - run: uv run python -m spacy download en_core_web_sm
       - run: make check
 
   # Each orchestrator extra must work with only core + its own deps (no hidden cross-imports).

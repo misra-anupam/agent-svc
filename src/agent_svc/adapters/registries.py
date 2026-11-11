@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from agent_svc.adapters import factories as fx
 from agent_svc.adapters.llm.stack import build_llm_stack
 from agent_svc.config.settings import Settings
+from agent_svc.domain.models import Principal
 from agent_svc.domain.ports import (
     AgentRunner,
     Authenticator,
     Cache,
     Embedder,
+    Guardrail,
     LLMClient,
     LongTermMemory,
     RunBuffer,
@@ -37,6 +42,20 @@ orchestrators.register(
 )
 orchestrators.register("maf", "agent_svc.adapters.orchestrators.maf:build", extra="maf")
 orchestrators.register("crewai", "agent_svc.adapters.orchestrators.crewai:build", extra="crewai")
+
+
+# Guardrails: factory(settings) -> Guardrail
+guardrails: Registry[Guardrail] = Registry("guardrails")
+guardrails.register("builtin", "agent_svc.adapters.guardrails.builtin:build")
+guardrails.register("presidio", "agent_svc.adapters.guardrails.presidio:build", extra="presidio")
+guardrails.register(
+    "guardrails_ai", "agent_svc.adapters.guardrails.guardrails_ai:build", extra="guardrails_ai"
+)
+# no uv extra: llm-guard's pins conflict with the shared lock (archived upstream); see adapter docs
+guardrails.register("llm_guard", "agent_svc.adapters.guardrails.llm_guard:build")
+guardrails.register("nemo", "agent_svc.adapters.guardrails.http_rails:build_nemo")
+guardrails.register("llama_guard", "agent_svc.adapters.guardrails.http_rails:build_llama_guard")
+guardrails.register("prompt_guard", "agent_svc.adapters.guardrails.http_rails:build_prompt_guard")
 
 
 # Tool sources: factory(settings) -> ToolProvider | None (None = not configured)
@@ -94,6 +113,12 @@ def build_llm(settings: Settings) -> LLMClient:
 def build_tool_sources(settings: Settings) -> list[ToolProvider]:
     sources = (tool_sources.create(name, settings) for name in tool_sources.names())
     return [s for s in sources if s is not None]
+
+
+def build_guardrail_policy(settings: Settings) -> Callable[[Principal], Any]:
+    from agent_svc.adapters.guardrails.policy import TierPolicyResolver
+
+    return TierPolicyResolver(settings.guardrails, lambda n: guardrails.create(n, settings))
 
 
 def build_runner(settings: Settings, llm: LLMClient, tools: ToolProvider) -> AgentRunner:

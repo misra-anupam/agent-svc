@@ -1,4 +1,4 @@
-# Profiles: otel | lgtm | mlflow | langfuse | mcp-demo   e.g.  docker compose --profile lgtm --profile mlflow up
+# Profiles: otel | lgtm | mlflow | langfuse | mcp-demo | guardrails | guardrails-gpu   e.g.  docker compose --profile lgtm --profile mlflow up
 # Pick the tracer with AGENT_TRACING__PROVIDER and install its extra via AGENT_EXTRAS, e.g.
 #   AGENT_EXTRAS="--extra litellm --extra langgraph --extra otel" docker compose --profile otel up --build
 name: agent-svc
@@ -24,6 +24,13 @@ services:
       # MCP: see the mcp-demo profile for a ready-made server (needs `--extra mcp` in AGENT_EXTRAS)
       AGENT_MCP__SERVERS: ${AGENT_MCP__SERVERS:-[]}
       AGENT_MCP__ALLOWED_HOSTS: ${AGENT_MCP__ALLOWED_HOSTS:-[]}
+      AGENT_GUARDRAILS__ENABLED_INPUT: ${AGENT_GUARDRAILS__ENABLED_INPUT:-["builtin"]}
+      AGENT_GUARDRAILS__ENABLED_OUTPUT: ${AGENT_GUARDRAILS__ENABLED_OUTPUT:-["builtin"]}
+      AGENT_GUARDRAILS__PROMPT_GUARD__URL: ${AGENT_GUARDRAILS__PROMPT_GUARD__URL:-http://prompt-guard:80/predict}
+      AGENT_GUARDRAILS__LLAMA_GUARD__URL: ${AGENT_GUARDRAILS__LLAMA_GUARD__URL:-http://llama-guard:8000/v1}
+      AGENT_GUARDRAILS__LLAMA_GUARD__MODEL: ${AGENT_GUARDRAILS__LLAMA_GUARD__MODEL:-meta-llama/Llama-Guard-3-1B}
+      AGENT_GUARDRAILS__NEMO__URL: ${AGENT_GUARDRAILS__NEMO__URL:-http://nemo-guardrails:8000}
+      AGENT_GUARDRAILS__NEMO__CONFIG_ID: ${AGENT_GUARDRAILS__NEMO__CONFIG_ID:-default}
       AGENT_TOOLS__LOCAL: ${AGENT_TOOLS__LOCAL:-["calculator","current_time"]}
     ports: ["8000:8000"]
     depends_on:
@@ -56,6 +63,37 @@ services:
     command: ["sh", "-c", "pip install --no-cache-dir 'mcp>=1.0' && python /srv/mcp_server.py streamable-http 8080"]
     volumes: [../tests/fixtures/mcp_server.py:/srv/mcp_server.py:ro]
     expose: ["8080"]
+
+  # ---- profile: guardrails (classifier sidecars; CPU) -----------------------------------------
+  # NOT BOOTED in CI: Prompt Guard is a gated model (set HF_TOKEN after accepting Meta's licence).
+  #   AGENT_GUARDRAILS__ENABLED_INPUT='["builtin","prompt_guard"]' docker compose --profile guardrails up
+  prompt-guard:
+    profiles: [guardrails]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    command: ["--model-id", "meta-llama/Prompt-Guard-86M"]
+    environment: {HF_TOKEN: "${HF_TOKEN:-}"}
+    volumes: [hf-cache:/data]
+  # NeMo Guardrails server; mount your rails config (config.yml + Colang) at ./guardrails-config
+  nemo-guardrails:
+    profiles: [guardrails]
+    image: python:3.12-slim
+    command: ["sh", "-c", "pip install --no-cache-dir nemoguardrails && nemoguardrails server --config /config --port 8000"]
+    environment: {NEMO_GUARDRAILS_TELEMETRY: "off", OPENAI_API_KEY: "${OPENAI_API_KEY:-}"}
+    volumes: [./guardrails-config:/config:ro]
+    expose: ["8000"]
+
+  # ---- profile: guardrails-gpu (Llama Guard via vLLM; needs an NVIDIA GPU + HF_TOKEN) ---------
+  llama-guard:
+    profiles: [guardrails-gpu]
+    image: vllm/vllm-openai:v0.6.3
+    command: ["--model", "meta-llama/Llama-Guard-3-1B"]
+    environment: {HUGGING_FACE_HUB_TOKEN: "${HF_TOKEN:-}"}
+    volumes: [hf-cache:/root/.cache/huggingface]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+    expose: ["8000"]
 
   # ---- profile: otel (OpenTelemetry Collector -> Jaeger UI on :16686) -------------------------
   otel-collector:
@@ -189,4 +227,5 @@ volumes:
   mlflow-data:
   lf-pg:
   lf-ch:
+  hf-cache:
   lf-minio:

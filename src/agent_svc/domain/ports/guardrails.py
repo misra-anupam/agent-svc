@@ -24,5 +24,7 @@ class Guardrail(Protocol):
     name: str
 
     async def check(
-        self, text: str, *, stage: GuardrailStage, principal: Principal
-    ) -> GuardrailResult: ...
+        self, text: str, *, stage: GuardrailStage, principal: Principal, context: str = ""
+    ) -> GuardrailResult:
+        """``context`` is the user's prompt when checking an answer (output stage)."""
+        ...

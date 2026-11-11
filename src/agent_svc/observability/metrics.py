@@ -24,3 +24,13 @@ CACHE_REQUESTS = Counter("agent_cache_requests_total", "Answer cache lookups", [
 RATE_LIMITED = Counter(
     "agent_rate_limited_total", "Rejected/throttled requests", ["reason", "tier"]
 )
+
+GUARDRAIL_CHECKS = Counter(
+    "agent_guardrail_checks_total", "Guardrail verdicts", ["rail", "stage", "action"]
+)
+GUARDRAIL_LATENCY = Histogram(
+    "agent_guardrail_seconds",
+    "Guardrail latency per rail",
+    ["rail", "stage"],
+    buckets=(0.001, 0.005, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5),
+)

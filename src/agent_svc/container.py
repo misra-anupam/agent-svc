@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from typing import Any
 
 import structlog
 
 from agent_svc.adapters import registries as reg
 from agent_svc.adapters.cache.cached_runner import CachedRunner
 from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
+from agent_svc.adapters.guardrails.guarded_runner import GuardedRunner
 from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.infra.postgres import PostgresResource
 from agent_svc.adapters.infra.redis import RedisResource
@@ -52,6 +54,7 @@ class Container:
         self.tracer: Tracer | None = None
         self.tools: ToolProvider | None = None
         self._tool_sources: list[ToolProvider] = []
+        self._guard_policy: Any = None
         self.kv: Cache | None = None  # small key/value store (idempotency keys)
         self._extra = extra_resources or []
         self._started: list[Resource] = []
@@ -116,6 +119,9 @@ class Container:
             max_result_chars=s.tools.max_result_chars,
         )
         runner = reg.build_runner(s, base_llm, self.tools)
+        if s.guardrails.enabled:  # inside the cache: cached answers were already output-checked
+            self._guard_policy = reg.build_guardrail_policy(s)
+            runner = GuardedRunner(runner, self._guard_policy, s.guardrails)
         if s.cache.provider != "none":
             runner = CachedRunner(runner, reg.caches.create(s.cache.provider, s, infra), s.cache)
         self.tracer = reg.tracers.create(s.tracing.provider, s)
@@ -162,6 +168,10 @@ class Container:
         self.kv = RedisCache(redis, "kv") if redis is not None else InMemoryCache()
 
     async def stop(self) -> None:
+        if self._guard_policy is not None:
+            with suppress(Exception):
+                await self._guard_policy.aclose()
+            self._guard_policy = None
         if self.tracer is not None:
             with suppress(Exception):
                 await asyncio.wait_for(self.tracer.shutdown(), timeout=10)  # flush spans

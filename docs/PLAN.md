@@ -153,3 +153,25 @@ Tasks:
   - Framework quirks handled: MAF silently stops at max iterations (cap enforced in the runner); CrewAI
     runs sync in a worker thread (bridged to the service loop; iteration cap enforced in the LLM bridge).
   - Not run: the isolation matrix itself (needs CI); `mcp-demo` was validated with `compose config`, not booted.
+- **Phase 6**: done. `GuardrailChain` (redactions feed forward, first block wins, per-rail timeout,
+  `fail_mode` closed|open) and `GuardedRunner` (inside the cache, outside the orchestrator). Input is checked
+  before the agent runs; output in `buffer` mode (nothing blocked ever leaves) or `stream` mode (re-checked every
+  `stream_check_chars`; a prefix may already be out). Each check is a `guardrail` step in the SSE stream and
+  traces; blocks end in `run.error` code `policy_violation` (with `rail`, `stage`, `reason`). Per-tier policy via
+  `guardrails.tier_policy`. Rails: `builtin` (injection heuristics on NFKC/zero-width-stripped text, secrets, output
+  hazards/exfil images, system-prompt leak, length), `presidio` (PII, spaCy `en_core_web_sm`), `guardrails_ai`
+  (validators as `module:attr`; **telemetry forced off** - the SDK exports traces to a third party by default and
+  `Guard()` re-enables it, so it is disabled after construction), and HTTP sidecar rails `llama_guard`
+  (OpenAI-compatible), `prompt_guard` (text-classification), `nemo` (server + refusal marker). `llm_guard` is
+  deprecated, has **no uv extra** (its pins conflict with the shared lock), and is tested only against a stub.
+  - Adversarial suite: `tests/guardrails/adversarial.jsonl` (OWASP LLM01/02/05/07/10 + benign controls) runs
+    against `builtin`; Presidio, Guardrails AI and the sidecar adapters have their own behavioural tests.
+  - Measured overhead (`PYTHONPATH=. uv run python scripts/bench_guardrails.py`, M-series laptop, short texts):
+    builtin ~0.01 ms mean, presidio ~2 ms mean (p95 2.5 ms). Sidecar rails are network + model bound; use the
+    `agent_guardrail_seconds` histogram.
+  - Not verified: the `guardrails` / `guardrails-gpu` compose profiles pass `compose config` but were **not booted**
+    (gated Meta models need an HF token; Llama Guard needs a GPU). The sidecar adapters are tested against mock
+    HTTP servers, not the real models, and the NeMo refusal marker / request shape is version-dependent.
+  - Limitations: only the newest user message is checked (history/memory/tool output is trusted, so indirect
+    prompt injection through tools is only partially covered by the tool allowlist + output cap). Cached answers
+    were output-checked under the policy active when they were cached.
