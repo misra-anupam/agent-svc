@@ -1,0 +1,32 @@
+name: agent-svc
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        EXTRAS: ${AGENT_EXTRAS:-}
+    env_file: [../env/local-min.env]
+    environment:
+      AGENT_REDIS__URL: redis://redis:6379/0
+      AGENT_POSTGRES__DSN: postgresql://agent:agent@postgres:5432/agent
+    ports: ["8000:8000"]
+    depends_on:
+      redis: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10}
+    volumes: [redis-data:/data]
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_USER: agent, POSTGRES_PASSWORD: agent, POSTGRES_DB: agent}
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U agent"], interval: 5s, timeout: 3s, retries: 10}
+    volumes: [pg-data:/var/lib/postgresql/data]
+volumes:
+  redis-data:
+  pg-data:
