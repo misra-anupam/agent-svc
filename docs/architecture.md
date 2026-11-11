@@ -1,11 +1,6 @@
 # Architecture
 
-```
-api  ->  application  ->  domain  <-  adapters
- |            |             ports        (LLM, tools, memory, cache, tracing,
- |            |                           guardrails, prompts, evaluators ...)
- FastAPI    ChatService, AdmissionService, MemoryFacade, GoldenRunner
-```
+![Hexagonal architecture: api, application and domain layers; adapters implement the domain ports; the container wires everything together](assets/architecture.svg)
 
 * **domain**: frozen dataclasses, exceptions and `Protocol` ports. No framework imports.
 * **application**: use cases that depend only on ports.
@@ -24,13 +19,9 @@ entry points in the `agent_svc.<port>` group.
 
 ## Request path
 
-```
-HTTP -> auth -> admission (rate limit -> token budget -> concurrency lease)
-     -> TracedRunner -> CachedRunner -> GuardedRunner -> orchestrator
-                                                          |-> LLM stack: Metered(Fallback(Breaker(Retry(LiteLLM))))
-                                                          '-> tools: Guarded(Composite(local, MCP))
-     -> SSE events (run.started, step.*, message.delta, usage, message.completed, run.completed | run.error)
-```
+![Request path: HTTP, auth, admission, then the TracedRunner, CachedRunner and GuardedRunner decorators around the orchestrator, which calls the LLM stack and the tool stack; events stream back as SSE](assets/request-path.svg)
+
+The SSE events are `run.started`, `step.*`, `message.delta`, `usage`, `message.completed` and then `run.completed` or `run.error`.
 
 * **TracedRunner** is outermost, so cache hits are traced too.
 * **CachedRunner** sits outside the guard: cached answers were output-checked when stored.
@@ -48,7 +39,7 @@ the stream starts).
 
 ## Extras
 
-Heavy dependencies live in uv extras (`litellm`, `langgraph`, `adk`, `deepagents`, `maf`, `crewai`,
-`mcp`, `otel`, `mlflow`, `mlflow_genai`, `langfuse`, `langsmith`, `presidio`, `guardrails_ai`,
-`adk_eval`). They resolve together in one lock; CI also proves each orchestrator extra alone.
+Heavy dependencies live in uv extras (`litellm`, `langgraph`,
+`mcp`, `otel`, `mlflow`, `mlflow_genai`, `langfuse`, `langsmith`, `presidio`, `guardrails_ai`).
+They resolve together in one lock; CI also proves the orchestrator extra alone.
 `llm-guard` has no extra: its pins conflict with the lock.

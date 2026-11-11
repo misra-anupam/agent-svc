@@ -27,8 +27,8 @@ from agent_svc.domain.models import (
     UsageReported,
 )
 
-# CI runs each extra in isolation: CONTRACT_PROVIDERS=adk pytest tests/contract
-PROVIDERS = os.environ.get("CONTRACT_PROVIDERS", "langgraph,deepagents,adk,maf,crewai").split(",")
+# CI runs each extra in isolation: CONTRACT_PROVIDERS=langgraph pytest tests/contract
+PROVIDERS = os.environ.get("CONTRACT_PROVIDERS", "langgraph").split(",")
 CALC = ToolCall("c1", "calculator", {"expression": "2+3"})
 
 

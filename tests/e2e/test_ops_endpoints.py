@@ -66,7 +66,7 @@ async def _noop() -> None:
     return None
 
 
-@pytest.mark.parametrize("provider", ["adk"])
+@pytest.mark.parametrize("provider", ["langgraph"])
 async def test_missing_extra_fails_startup_clearly(
     settings: Settings, provider: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -81,7 +81,7 @@ async def test_missing_extra_fails_startup_clearly(
     )
     settings.orchestrator.provider = provider  # type: ignore[assignment]
     app = create_app(settings)
-    with pytest.raises(ConfigurationError, match="uv sync --extra adk"):
+    with pytest.raises(ConfigurationError, match="uv sync --extra langgraph"):
         async with app.router.lifespan_context(app):
             pass
 

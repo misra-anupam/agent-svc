@@ -58,7 +58,7 @@ class LLMSettings(BaseModel):
 
 
 class OrchestratorSettings(BaseModel):
-    provider: Literal["langgraph", "adk", "deepagents", "maf", "crewai", "echo"] = "echo"
+    provider: Literal["langgraph", "echo"] = "echo"
     system_prompt: str = "You are a helpful assistant. Use tools when they help."
     max_iterations: int = 8  # cap on model/tool loops per run (OWASP LLM10)
 
@@ -100,7 +100,7 @@ class PromptStoreSettings(BaseModel):
 
 
 class EvalSettings(BaseModel):
-    provider: Literal["local", "mlflow_genai", "langsmith", "adk_eval"] = "local"
+    provider: Literal["local", "mlflow_genai", "langsmith"] = "local"
     golden_dir: str = "evals/golden"
     thresholds_file: str = "evals/golden/thresholds.yaml"
     mlflow_tracking_uri: str = ""  # empty: a local sqlite file under evals/.mlflow

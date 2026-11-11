@@ -185,7 +185,7 @@ GATE = {"answer_match": Threshold(min=1.0), "tool_trajectory": Threshold(min=1.0
 
 
 def evaluator_params() -> list[str]:
-    names = ["local", "langsmith", "adk_eval", "mlflow_genai"]
+    names = ["local", "langsmith", "mlflow_genai"]
     return names
 
 
@@ -209,15 +209,6 @@ async def test_each_evaluator_reports_the_same_core_metrics_and_fails_the_gate(
     assert not report.passed and len(report.failures) == 2
     ok = await ev.evaluate(RECORDS[:1], agent_version="9.9.9", thresholds=GATE)
     assert ok.passed and ok.failures == ()
-
-
-async def test_adk_metrics_are_reported_alongside(settings: Settings) -> None:
-    report = await reg.evaluators.create("adk_eval", settings).evaluate(
-        RECORDS, agent_version="1", thresholds={}
-    )
-    assert (
-        report.metrics["adk_tool_trajectory"] == 0.5 and report.metrics["adk_response_match"] == 1.0
-    )
 
 
 async def test_mlflow_run_is_tagged_with_agent_version_and_gate_result(settings: Settings) -> None:

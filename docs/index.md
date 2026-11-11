@@ -5,14 +5,14 @@ every concern behind a port you can swap by configuration.
 
 | Concern | Choices |
 |---|---|
-| Orchestrator | LangGraph, deepagents, Google ADK, Microsoft Agent Framework, CrewAI (`echo` for demos) |
+| Orchestrator | LangGraph (`echo` for demos) |
 | LLM | LiteLLM with retry, circuit breaker and primary/secondary fallback |
 | Tools | local tools, MCP servers (stdio / streamable-http) |
 | State | thread (Redis), user (Postgres), long-term (pgvector) memory |
 | Protection | tiered rate limits, token budgets, concurrency caps, JWT, answer cache (exact + optional semantic) |
 | Guardrails | builtin, Presidio, Guardrails AI, Prompt Guard, Llama Guard, NeMo, LLM Guard (deprecated) |
 | Observability | OpenTelemetry, MLflow, Langfuse, Prometheus, Grafana, Loki |
-| Prompts / evals | file, MLflow, LangSmith stores; local, MLflow GenAI, LangSmith, ADK evaluators |
+| Prompts / evals | file, MLflow, LangSmith stores; local, MLflow GenAI, LangSmith evaluators |
 
 ```bash
 make install && make check

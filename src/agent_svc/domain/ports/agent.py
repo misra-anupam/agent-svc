@@ -9,7 +9,7 @@ from agent_svc.domain.models import AgentEvent, AgentRequest
 class AgentRunner(Protocol):
     """Runs one agent turn and streams framework-neutral events.
 
-    Implementations wrap LangGraph/ADK/deepagents/MAF/CrewAI. Decorators (guardrails, cache,
+    Implementations wrap an agent framework (LangGraph today). Decorators (guardrails, cache,
     tracing, metering) implement the same port, so they stack freely.
     """
 

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" role="img" aria-label="Hexagonal architecture: api, application and domain layers; adapters implement the domain ports; the container wires them"><style>
+text{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;fill:#1f2937}
+.t{font-weight:600}.s{font-size:12.5px;fill:#4b5563}.n{font-size:13px;fill:#8b95a1}
+.box{fill:#eef2f7;stroke:#94a3b8;stroke-width:1.5}
+.dec{fill:#e8f0fe;stroke:#6b8afd;stroke-width:1.5}
+.grp{fill:none;stroke:#6b8afd;stroke-width:1.5;stroke-dasharray:6 5}
+.orc{fill:#fff4e5;stroke:#f59e0b;stroke-width:1.5}
+.out{fill:#e7f6ec;stroke:#34a853;stroke-width:1.5}
+.ad{fill:#f3e8fd;stroke:#a855f7;stroke-width:1.5}
+.ln{stroke:#8b95a1;stroke-width:1.8;fill:none;marker-end:url(#a)}
+.ld{stroke:#8b95a1;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#a)}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b95a1"/></marker></defs>
+<rect class="box" x="40" y="30" width="320" height="72" rx="9"/><text class="t" x="200.0" y="61.0" text-anchor="middle">api</text><text class="s" x="200.0" y="79.0" text-anchor="middle">FastAPI routers, SSE, RFC 9457 errors, auth</text>
+<rect class="box" x="40" y="162" width="320" height="72" rx="9"/><text class="t" x="200.0" y="193.0" text-anchor="middle">application</text><text class="s" x="200.0" y="211.0" text-anchor="middle">ChatService, AdmissionService, MemoryFacade</text>
+<rect class="box" x="40" y="294" width="320" height="128" rx="9"/><text class="t" x="200.0" y="335.0" text-anchor="middle">domain</text><text class="s" x="200.0" y="353.0" text-anchor="middle">frozen dataclasses and exceptions</text><text class="s" x="200.0" y="371.0" text-anchor="middle">ports (Protocols): LLMClient, AgentRunner,</text><text class="s" x="200.0" y="389.0" text-anchor="middle">ToolProvider, Cache, Guardrail, Tracer, PromptStore ...</text>
+<path class="ln" d="M200 102V162"/><path class="ln" d="M200 234V294"/>
+<text class="n" x="212" y="136">imports</text><text class="n" x="212" y="268">imports</text>
+<rect class="ad" x="500" y="294" width="360" height="128" rx="9"/><text class="t" x="680.0" y="335.0" text-anchor="middle">adapters</text><text class="s" x="680.0" y="353.0" text-anchor="middle">one module per implementation</text><text class="s" x="680.0" y="371.0" text-anchor="middle">orchestrators, llm, tools / MCP, memory, cache, ratelimit,</text><text class="s" x="680.0" y="389.0" text-anchor="middle">guardrails, tracing, prompts, eval, auth</text>
+<path class="ln" d="M500 358H360"/><text class="n" x="388" y="346">implement</text><text class="n" x="388" y="380">the ports</text>
+<rect class="orc" x="500" y="30" width="360" height="72" rx="9"/><text class="t" x="680.0" y="52.0" text-anchor="middle">container.py (composition root)</text><text class="s" x="680.0" y="70.0" text-anchor="middle">builds adapters from Settings</text><text class="s" x="680.0" y="88.0" text-anchor="middle">owns start / stop order</text>
+<path class="ln" d="M680 102V294"/><text class="n" x="692" y="205">constructs</text>
+<path class="ld" d="M500 66H430Q400 66 400 96V140Q400 198 360 198"/><text class="n" x="412" y="130">injects</text>
+<text class="n" x="40" y="454">import-linter enforces: api &gt; application &gt; domain; api and application never import adapters; domain imports no framework.</text>
+</svg>

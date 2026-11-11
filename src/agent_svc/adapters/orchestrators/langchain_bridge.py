@@ -1,4 +1,4 @@
-"""LangChain-side bridges used by the LangGraph and deepagents adapters.
+"""LangChain-side bridges used by the LangGraph adapter.
 
 * ``PortChatModel``: exposes our resilient ``LLMClient`` (retry/breaker/fallback/metering) as a
   LangChain chat model with tool calling.

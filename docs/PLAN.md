@@ -202,7 +202,7 @@ Tasks:
     fail-open guardrails). CI `security` job: bandit (B101 skipped: asserts only narrow types), `pip-audit` (core
     runtime deps are a hard gate and currently clean; all-extras is informational), Trivy secret/misconfig scan and a
     CycloneDX SBOM artifact. `pip-audit` on every extra found `filelock` 3.32.7 (13 advisories, via litellm /
-    huggingface-hub) and `chromadb` 1.5.9 (4 advisories, no fix, via crewai): documented, not suppressed.
+    huggingface-hub) (chromadb, which came via crewai, left with that extra): documented, not suppressed.
   - **Semantic cache** (deferred from Phase 3): `cache.semantic=true` reuses answers to similar questions
     (cosine >= `semantic_threshold`, default 0.95), partitioned by agent version, scope and prior conversation;
     embedder outages degrade to normal answering. Off by default. In-process per instance (a pgvector index is the
@@ -223,3 +223,7 @@ Tasks:
     - `mcp-demo`, `guardrails`, `guardrails-gpu` profiles were validated with `compose config` only.
     - No soak test was run; `tests/load/limits_smoke.py` (Phase 3) is the only load script.
     - LangSmith (live), the MLflow LLM judge, and the real Prompt Guard / Llama Guard / NeMo sidecars were not exercised.
+
+
+## Scope reduction (2026-11-11)
+The ADK, deepagents, MAF and CrewAI orchestrators and the `adk_eval` evaluator were removed to keep the template small for training. LangGraph and `echo` remain; the ports and registry make re-adding another framework a one-adapter change. Earlier phase notes above describe them as built.

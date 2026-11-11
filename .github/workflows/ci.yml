@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow --extra adk --extra deepagents --extra maf --extra crewai --extra mcp --extra presidio --extra guardrails_ai --extra mlflow_genai --extra langsmith --extra adk_eval
+      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow --extra mcp --extra presidio --extra guardrails_ai --extra mlflow_genai --extra langsmith
       - run: uv run python -m spacy download en_core_web_sm
       - run: make check
       - run: make eval  # golden-dataset gate
@@ -19,10 +19,6 @@ jobs:
       matrix:
         include:
           - {provider: langgraph, extras: "--extra langgraph"}
-          - {provider: deepagents, extras: "--extra langgraph --extra deepagents"}
-          - {provider: adk, extras: "--extra adk"}
-          - {provider: maf, extras: "--extra maf"}
-          - {provider: crewai, extras: "--extra crewai"}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

@@ -12,7 +12,7 @@ SERVER = str(Path(__file__).parent.parent / "fixtures" / "mcp_server.py")
 BODY = {"messages": [{"role": "user", "content": "add 2 and 3 with the demo server"}]}
 
 
-@pytest.mark.parametrize("orchestrator", ["langgraph", "deepagents"])
+@pytest.mark.parametrize("orchestrator", ["langgraph"])
 async def test_agent_calls_mcp_tool_and_ui_sees_an_mcp_step(
     settings,
     make_client,

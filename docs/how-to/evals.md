@@ -6,7 +6,6 @@
 ```bash
 make eval                                            # scripted model, local scorer, no API key
 make eval EVAL_ARGS="--evaluator mlflow_genai"       # logs a tagged MLflow run
-make eval EVAL_ARGS="--evaluator adk_eval"           # adds ADK trajectory + ROUGE metrics
 uv run agent-svc-eval --real --exclude-tags simulate-only   # your configured model
 ```
 
@@ -28,7 +27,6 @@ contract. It does **not** measure model quality: use `--real` for that, ideally 
 | `error_expectation` | the run ended with the expected error (or none) |
 | `unexpected_error_rate` | runs that failed when they should not have |
 | `latency_p50_ms`, `latency_p95_ms`, `cost_usd_total`, `tokens_mean` | operational |
-| `adk_tool_trajectory`, `adk_response_match` | `adk_eval` only |
 
 A thresholded metric that cannot be computed fails the gate rather than being skipped.
 

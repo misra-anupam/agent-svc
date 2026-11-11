@@ -42,21 +42,6 @@ langfuse = [
 mlflow = [
     "mlflow-tracing>=3.0",
 ]
-adk = [
-    "google-adk>=1.0",
-]
-adk_eval = [
-    "google-adk[eval]>=1.0",
-]
-deepagents = [
-    "deepagents>=0.3",
-]
-crewai = [
-    "crewai>=1.0",
-]
-maf = [
-    "agent-framework-core>=1.20",
-]
 mcp = [
     "mcp>=1.0",
 ]
@@ -137,7 +122,7 @@ module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["agent_svc.adapters.llm.litellm_client", "litellm", "litellm.*", "google.adk", "google.adk.*"]
+module = ["agent_svc.adapters.llm.litellm_client", "litellm", "litellm.*"]
 implicit_reexport = true
 
 [[tool.mypy.overrides]]

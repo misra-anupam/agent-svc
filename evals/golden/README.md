@@ -11,7 +11,7 @@ One JSON object per line (`*.jsonl`); `#` lines are comments.
 | `expect_error` | error code the run must end with, e.g. `policy_violation` |
 | `tags` | filter with `--tags` / `--exclude-tags` |
 | `metadata.simulate` | `{"reply", "tools":[{"name","arguments"}]}`: what the scripted model does in `--simulate` runs |
-| `metadata.reference` | a full reference answer (used by the `adk_eval` ROUGE metric) |
+| `metadata.reference` | a full reference answer (free-form; not scored by the built-in evaluators) |
 
 `make eval` replays the cases through the real service stack (guardrails, tools, orchestrator) with a
 scripted model, so the gate needs no API key. It guards routing, guardrails and the answer contract,

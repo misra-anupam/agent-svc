@@ -38,12 +38,6 @@ orchestrators.register("echo", "agent_svc.adapters.orchestrators.echo:build_echo
 orchestrators.register(
     "langgraph", "agent_svc.adapters.orchestrators.langgraph:build", extra="langgraph"
 )
-orchestrators.register("adk", "agent_svc.adapters.orchestrators.adk:build", extra="adk")
-orchestrators.register(
-    "deepagents", "agent_svc.adapters.orchestrators.deepagents:build", extra="deepagents"
-)
-orchestrators.register("maf", "agent_svc.adapters.orchestrators.maf:build", extra="maf")
-orchestrators.register("crewai", "agent_svc.adapters.orchestrators.crewai:build", extra="crewai")
 
 
 # Guardrails: factory(settings) -> Guardrail
@@ -73,7 +67,6 @@ evaluators.register(
     "mlflow_genai", "agent_svc.adapters.eval.mlflow_genai:build", extra="mlflow_genai"
 )
 evaluators.register("langsmith", "agent_svc.adapters.eval.langsmith:build", extra="langsmith")
-evaluators.register("adk_eval", "agent_svc.adapters.eval.adk_eval:build", extra="adk_eval")
 
 
 def build_prompt_store(settings: Settings) -> PromptStore:
