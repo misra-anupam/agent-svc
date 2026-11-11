@@ -10,6 +10,7 @@ class DomainError(Exception):
     code: str = "internal_error"
     title: str = "Internal Server Error"
     retryable: bool = False
+    headers: dict[str, str] = {}  # noqa: RUF012 - read-only class default
 
     def __init__(
         self, detail: str | None = None, *, retryable: bool | None = None, **extra: Any
@@ -27,6 +28,7 @@ class BadRequestError(DomainError):
 
 class UnauthorizedError(DomainError):
     status_code, code, title = 401, "unauthorized", "Unauthorized"
+    headers = {"WWW-Authenticate": "Bearer"}  # noqa: RUF012
 
 
 class ForbiddenError(DomainError):

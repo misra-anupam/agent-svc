@@ -14,6 +14,7 @@ from agent_svc import __version__
 from agent_svc.api.errors import install_error_handlers
 from agent_svc.api.middleware.request_context import RequestContextMiddleware
 from agent_svc.api.routers import health
+from agent_svc.api.sse import RunSupervisor
 from agent_svc.api.v1 import router as v1_router
 from agent_svc.config import Settings, get_settings
 from agent_svc.container import Container
@@ -28,11 +29,17 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await container.start()
+        assert container.run_buffer is not None
+        supervisor = RunSupervisor(
+            container.run_buffer, detach_on_disconnect=settings.app.detach_on_disconnect
+        )
         app.state.container = container
+        app.state.supervisor = supervisor
         try:
             yield
         finally:
             structlog.get_logger().info("shutting_down")
+            await supervisor.drain(settings.app.shutdown_grace_seconds)  # finish in-flight runs
             await container.stop()
 
     app = FastAPI(

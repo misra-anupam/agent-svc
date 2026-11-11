@@ -120,3 +120,17 @@ Tasks:
 
 ## Verification (every phase)
 `uv run ruff check && uv run mypy && uv run lint-imports && uv run pytest`, plus the phase's exit criteria, a compose smoke test for the touched profiles, and a git commit per phase.
+
+---
+## Progress log
+- **Phase 0–2**: done (foundation, LangGraph slice, resilient LLM stack, SSE).
+- **Phase 3**: done. Memory (thread/user/long-term), exact-match answer cache with single-flight,
+  JWT (switchable), tier rate limits, IP + user token budgets, concurrency leases, Idempotency-Key,
+  SSE resume via RunBuffer. Verified with fakeredis (Lua), real pgvector (`make test-integration`)
+  and a live load run (`tests/load/limits_smoke.py`).
+  - **Deferred**: the *semantic* answer cache (`CacheSettings.semantic` is reserved, not implemented).
+    Exact-match caching is shipped. Plan: implement on top of `Embedder` + pgvector in Phase 8.
+  - **Not yet run**: full `docker compose up` smoke with Redis and Postgres (done in Phase 8).
+- **Phase 5 note**: heavy framework extras (adk, deepagents, maf, crewai) are not in `pyproject.toml`
+  yet; `agent-framework` failed to resolve against the base lock, so conflicts are handled when
+  that phase starts.

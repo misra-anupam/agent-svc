@@ -52,6 +52,8 @@ def install_error_handlers(app: FastAPI) -> None:
         if exc.status_code >= 500:
             log.error("domain_error", code=exc.code, detail=exc.detail)
         resp = _problem(request, exc.status_code, exc.title, exc.code, exc.detail)
+        for k, v in exc.headers.items():
+            resp.headers[k] = v
         if isinstance(exc, RateLimitedError):
             resp.headers["Retry-After"] = str(exc.retry_after)
         return resp

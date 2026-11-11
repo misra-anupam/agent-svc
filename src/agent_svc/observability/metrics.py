@@ -19,3 +19,8 @@ BREAKER_STATE = Gauge("agent_breaker_state", "0=closed 1=half_open 2=open", ["na
 BREAKER_TRANSITIONS = Counter(
     "agent_breaker_transitions_total", "Breaker transitions", ["name", "to"]
 )
+
+CACHE_REQUESTS = Counter("agent_cache_requests_total", "Answer cache lookups", ["result"])
+RATE_LIMITED = Counter(
+    "agent_rate_limited_total", "Rejected/throttled requests", ["reason", "tier"]
+)

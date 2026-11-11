@@ -27,6 +27,10 @@ class AppSettings(BaseModel):
     max_messages_per_request: int = 50
     max_message_chars: int = 20_000
     sse_heartbeat_seconds: float = 15.0
+    trusted_proxy_hops: int = 0  # >0: take client IP from X-Forwarded-For (behind N proxies)
+    run_buffer: Literal["inmemory", "redis"] = "inmemory"
+    run_buffer_ttl_seconds: int = 3_600
+    detach_on_disconnect: bool = False  # True: runs finish after disconnect so clients can resume
 
 
 class RedisSettings(BaseModel):
@@ -83,17 +87,26 @@ class GuardrailSettings(BaseModel):
 
 
 class MemorySettings(BaseModel):
-    thread_provider: Literal["redis", "inmemory"] = "inmemory"
-    user_provider: Literal["postgres", "inmemory"] = "inmemory"
-    long_term_provider: Literal["pgvector", "inmemory", "none"] = "none"
+    """ "none" thread memory = stateless: clients send the full history on each request."""
+
+    thread_provider: Literal["none", "inmemory", "redis"] = "none"
+    user_provider: Literal["none", "inmemory", "postgres"] = "none"
+    long_term_provider: Literal["none", "inmemory", "pgvector"] = "none"
     thread_ttl_seconds: int = 86_400
+    max_thread_messages: int = 200
     max_context_tokens: int = 8_000
+    long_term_top_k: int = 4
+    long_term_write: bool = True
+    embedding_provider: Literal["fake", "litellm"] = "fake"
+    embedding_model: str = "openai/text-embedding-3-small"
+    embedding_dim: int = 1536
 
 
 class CacheSettings(BaseModel):
-    provider: Literal["none", "redis", "inmemory"] = "none"
+    provider: Literal["none", "inmemory", "redis"] = "none"
     ttl_seconds: int = 3_600
-    semantic: bool = False
+    scope: Literal["user", "tenant", "global"] = "user"  # who may share a cached answer
+    max_entries: int = 1_000  # inmemory only
 
 
 class TierLimit(BaseModel):
@@ -123,6 +136,8 @@ class RateLimitSettings(BaseModel):
         }
     )
     default_tier: str = "free"
+    ip_daily_token_budget: int = 200_000
+    concurrency_lease_seconds: int = 300
 
 
 class AuthSettings(BaseModel):

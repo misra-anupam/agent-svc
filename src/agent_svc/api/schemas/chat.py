@@ -76,6 +76,7 @@ class RunErrorEvent(_Base):
 class RunCompletedEvent(_Base):
     type: Literal["run.completed"] = "run.completed"
     usage: UsageOut = Field(default_factory=UsageOut)
+    cached: bool = False
 
 
 SseEvent = Annotated[

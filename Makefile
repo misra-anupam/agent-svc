@@ -1,4 +1,4 @@
-.PHONY: install check lint types arch test run up docs
+.PHONY: test-integration install check lint types arch test run up docs
 install:
 	uv sync --group dev --extra litellm --extra langgraph
 lint:
@@ -9,6 +9,8 @@ arch:
 	uv run lint-imports
 test:
 	uv run pytest -q
+test-integration:
+	uv run pytest -q -m integration
 check: lint types arch test
 run:
 	uv run uvicorn agent_svc.main:app --reload --factory

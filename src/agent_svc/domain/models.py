@@ -150,3 +150,4 @@ class RunError(AgentEvent):
 class RunCompleted(AgentEvent):
     type: ClassVar[str] = "run.completed"
     usage: Usage = Usage()
+    cached: bool = False

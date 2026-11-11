@@ -7,12 +7,27 @@ from contextlib import suppress
 
 import structlog
 
+from agent_svc.adapters import registries as reg
+from agent_svc.adapters.cache.cached_runner import CachedRunner
+from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
+from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.infra.postgres import PostgresResource
 from agent_svc.adapters.infra.redis import RedisResource
-from agent_svc.adapters.registries import build_llm, build_runner
+from agent_svc.adapters.infra.schema import ensure_schema
+from agent_svc.application.admission import AdmissionService
+from agent_svc.application.memory_facade import MemoryFacade
 from agent_svc.config.settings import Settings
 from agent_svc.domain.exceptions import UnavailableError
-from agent_svc.domain.ports import AgentRunner, HealthCheck, LLMClient, ReadinessReport, Resource
+from agent_svc.domain.ports import (
+    AgentRunner,
+    Authenticator,
+    Cache,
+    HealthCheck,
+    LLMClient,
+    ReadinessReport,
+    Resource,
+    RunBuffer,
+)
 
 log = structlog.get_logger()
 
@@ -24,10 +39,17 @@ class Container:
         self.settings = settings
         self.resources: list[Resource] = []
         self.checks: list[HealthCheck] = []
-        self.runner: AgentRunner | None = None
         self.llm: LLMClient | None = None
+        self.runner: AgentRunner | None = None
+        self.authenticator: Authenticator | None = None
+        self.admission: AdmissionService | None = None
+        self.memory: MemoryFacade = MemoryFacade(settings.memory)
+        self.run_buffer: RunBuffer | None = None
+        self.kv: Cache | None = None  # small key/value store (idempotency keys)
         self._extra = extra_resources or []
         self._started: list[Resource] = []
+        self._redis: RedisResource | None = None
+        self._pg: PostgresResource | None = None
 
     def _register(self, res: Resource) -> None:
         self.resources.append(res)
@@ -37,10 +59,14 @@ class Container:
     async def start(self) -> None:
         s = self.settings
         if s.redis.enabled:
-            self._register(RedisResource(s.redis))
+            self._redis = RedisResource(s.redis)
+            self._register(self._redis)
         if s.postgres.enabled:
-            self._register(PostgresResource(s.postgres))
+            self._pg = PostgresResource(s.postgres)
+            self._register(self._pg)
         for res in self._extra:
+            if isinstance(res, RedisResource) and self._redis is None:
+                self._redis = res
             self._register(res)
 
         for res in self.resources:  # ordered startup
@@ -55,9 +81,67 @@ class Container:
             self._started.append(res)
             log.info("resource_started", resource=res.name)
 
-        self.llm = build_llm(s)
-        self.runner = build_runner(s, self.llm)
+        try:
+            await self._build()
+        except BaseException:
+            await self.stop()
+            raise
         log.info("container_ready", orchestrator=s.orchestrator.provider)
+
+    async def _build(self) -> None:
+        s = self.settings
+        redis = self._redis.client if self._redis and self._redis in self._started else None
+        pool = self._pg.pool if self._pg and self._pg in self._started else None
+        infra = Infra(redis=redis, pg_pool=pool)
+
+        self.authenticator = reg.authenticators.create("jwt" if s.auth.enabled else "noauth", s)
+
+        base_llm = reg.build_llm(s)
+        self.llm = base_llm
+        runner = reg.build_runner(s, base_llm)
+        if s.cache.provider != "none":
+            runner = CachedRunner(runner, reg.caches.create(s.cache.provider, s, infra), s.cache)
+        self.runner = runner
+
+        backend = None
+        if s.ratelimit.provider != "none":
+            backend = reg.limit_backends.create(s.ratelimit.provider, s, infra)
+        self.admission = AdmissionService(
+            s.ratelimit,
+            limiter=backend.limiter if backend else None,
+            budget=backend.budget if backend else None,
+            gate=backend.gate if backend else None,
+        )
+
+        m = s.memory
+        if pool is not None and (
+            m.user_provider == "postgres" or m.long_term_provider == "pgvector"
+        ):
+            await ensure_schema(
+                pool, embedding_dim=m.embedding_dim, vector=m.long_term_provider == "pgvector"
+            )
+        embedder = (
+            reg.embedders.create(m.embedding_provider, s)
+            if m.long_term_provider != "none"
+            else None
+        )
+        self.memory = MemoryFacade(
+            m,
+            thread=reg.thread_memories.create(m.thread_provider, s, infra)
+            if m.thread_provider != "none"
+            else None,
+            user=reg.user_memories.create(m.user_provider, s, infra)
+            if m.user_provider != "none"
+            else None,
+            long_term=(
+                reg.long_term_memories.create(m.long_term_provider, s, infra, embedder)
+                if embedder is not None
+                else None
+            ),
+        )
+
+        self.run_buffer = reg.run_buffers.create(s.app.run_buffer, s, infra)
+        self.kv = RedisCache(redis, "kv") if redis is not None else InMemoryCache()
 
     async def stop(self) -> None:
         for res in reversed(self._started):  # reverse-order teardown

@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 
 from agent_svc.api.schemas.chat import EVENT_MODELS
 from agent_svc.domain.models import AgentEvent
+from agent_svc.domain.ports import RunBuffer
 
 HEARTBEAT = b": ping\n\n"
 
@@ -24,42 +25,71 @@ def to_wire(event: AgentEvent) -> tuple[str, str]:
     return event.type, model.model_dump_json(exclude_none=True)
 
 
-async def sse_stream(
-    events: AsyncIterator[AgentEvent], *, heartbeat_seconds: float
-) -> AsyncIterator[bytes]:
-    """Pumps events through a queue so heartbeats flow during long silent tool calls.
+class RunSupervisor:
+    """Runs agent streams as background tasks that write SSE frames to a RunBuffer.
 
-    If the client disconnects, the generator is closed and the producer task is cancelled,
-    which propagates cancellation into the agent run.
+    Clients tail the buffer, so a dropped connection can resume from ``Last-Event-ID`` and a
+    repeated ``Idempotency-Key`` replays the original run instead of executing it twice. By
+    default a disconnect cancels the run (stops paying for abandoned work); with
+    ``detach_on_disconnect`` the run finishes in the background so it can be resumed.
     """
-    queue: asyncio.Queue[AgentEvent | None] = asyncio.Queue(maxsize=64)
 
-    async def produce() -> None:
+    def __init__(self, buffer: RunBuffer, *, detach_on_disconnect: bool) -> None:
+        self._buffer = buffer
+        self._detach = detach_on_disconnect
+        self._tasks: dict[str, asyncio.Task[None]] = {}
+
+    async def start(self, run_id: str, owner: str, events: AsyncIterator[AgentEvent]) -> None:
+        await self._buffer.start(run_id, owner)
+        task = asyncio.create_task(self._produce(run_id, events), name=f"run-{run_id}")
+        self._tasks[run_id] = task
+        task.add_done_callback(lambda _t: self._tasks.pop(run_id, None))
+
+    async def _produce(self, run_id: str, events: AsyncIterator[AgentEvent]) -> None:
+        seq = 0
         try:
             async for ev in events:
-                await queue.put(ev)
+                seq += 1
+                etype, data = to_wire(ev)
+                await self._buffer.append(run_id, frame(seq, etype, data))
         finally:
-            await queue.put(None)
+            aclose = getattr(events, "aclose", None)
+            if aclose:
+                with contextlib.suppress(Exception):
+                    await asyncio.shield(aclose())  # runs ChatService cleanup (lease release)
+            await asyncio.shield(self._buffer.finish(run_id))
 
-    task = asyncio.create_task(produce())
-    seq = 0
-    try:
-        while True:
-            try:
-                item = await asyncio.wait_for(queue.get(), timeout=heartbeat_seconds)
-            except TimeoutError:
-                yield HEARTBEAT
-                continue
-            if item is None:
-                return
-            seq += 1
-            etype, data = to_wire(item)
-            yield frame(seq, etype, data)
-    finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task
-        aclose = getattr(events, "aclose", None)
-        if aclose:
-            with contextlib.suppress(Exception):
-                await aclose()
+    async def owner(self, run_id: str) -> str | None:
+        return await self._buffer.owner(run_id)
+
+    async def tail(
+        self, run_id: str, *, after: int = 0, heartbeat_seconds: float
+    ) -> AsyncIterator[bytes]:
+        idx = after
+        try:
+            while True:
+                frames, done = await self._buffer.read(run_id, idx, heartbeat_seconds)
+                if frames:
+                    idx += len(frames)
+                    for f in frames:
+                        yield f
+                elif done:
+                    return
+                else:
+                    yield HEARTBEAT
+        finally:
+            if not self._detach:  # consumer gone (disconnect or finished): stop unfinished work
+                task = self._tasks.get(run_id)
+                if task and not task.done():
+                    task.cancel()
+
+    async def drain(self, grace_seconds: float) -> None:
+        """Graceful shutdown: let in-flight runs finish, then cancel stragglers."""
+        tasks = list(self._tasks.values())
+        if not tasks:
+            return
+        _, pending = await asyncio.wait(tasks, timeout=grace_seconds)
+        for t in pending:
+            t.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
