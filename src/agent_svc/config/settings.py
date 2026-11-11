@@ -90,12 +90,24 @@ class TracingSettings(BaseModel):
 
 class PromptStoreSettings(BaseModel):
     provider: Literal["file", "mlflow", "langsmith"] = "file"
-    path: str = "prompts"
+    path: str = "prompts"  # file store root: <path>/<name>/<version>.txt + aliases.json
+    # Load the agent's system prompt from the store at startup: "name@alias" or "name:version"
+    # (or just "name" for the latest). Empty keeps ``orchestrator.system_prompt``.
+    ref: str = ""
+    cache_ttl_seconds: float = 60.0
+    mlflow_tracking_uri: str = ""
+    langsmith_api_key: SecretStr | None = None
 
 
 class EvalSettings(BaseModel):
-    provider: Literal["none", "mlflow_genai", "langsmith", "adk_eval"] = "none"
+    provider: Literal["local", "mlflow_genai", "langsmith", "adk_eval"] = "local"
     golden_dir: str = "evals/golden"
+    thresholds_file: str = "evals/golden/thresholds.yaml"
+    mlflow_tracking_uri: str = ""  # empty: a local sqlite file under evals/.mlflow
+    mlflow_experiment: str = "agent-svc-golden"
+    # mlflow_genai: also run an LLM judge (Correctness) with this model, e.g. "openai:/gpt-4o-mini"
+    judge_model: str = ""
+    langsmith_upload: bool = False  # True sends results to LangSmith (needs LANGSMITH_API_KEY)
 
 
 class HttpRailSettings(BaseModel):

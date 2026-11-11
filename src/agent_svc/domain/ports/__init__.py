@@ -4,7 +4,13 @@ from agent_svc.domain.ports.agent import AgentRunner
 from agent_svc.domain.ports.auth import Authenticator
 from agent_svc.domain.ports.cache import Cache
 from agent_svc.domain.ports.embedding import Embedder
-from agent_svc.domain.ports.evaluation import EvalReport, Evaluator, GoldenCase
+from agent_svc.domain.ports.evaluation import (
+    EvalRecord,
+    EvalReport,
+    Evaluator,
+    GoldenCase,
+    Threshold,
+)
 from agent_svc.domain.ports.guardrails import Guardrail, GuardrailResult, GuardrailStage
 from agent_svc.domain.ports.lifecycle import (
     HealthCheck,
@@ -31,6 +37,7 @@ __all__ = [
     "Cache",
     "ConcurrencyGate",
     "Embedder",
+    "EvalRecord",
     "EvalReport",
     "Evaluator",
     "GoldenCase",
@@ -52,6 +59,7 @@ __all__ = [
     "RunBuffer",
     "Span",
     "ThreadMemory",
+    "Threshold",
     "TokenBudget",
     "ToolProvider",
     "Tracer",

@@ -10,3 +10,6 @@ site/
 dist/
 mlruns/
 .DS_Store
+evals/reports/
+evals/.mlflow/
+mlruns/

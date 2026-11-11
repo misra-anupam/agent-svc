@@ -17,7 +17,11 @@ dependencies = [
   "prometheus-client>=0.20",
   "pyjwt[crypto]>=2.9",
   "jsonschema>=4.26.0",
+  "pyyaml>=6.0",
 ]
+
+[project.scripts]
+agent-svc-eval = "agent_svc.cli.golden:main"
 
 [project.optional-dependencies]
 litellm = [
@@ -41,6 +45,9 @@ mlflow = [
 adk = [
     "google-adk>=1.0",
 ]
+adk_eval = [
+    "google-adk[eval]>=1.0",
+]
 deepagents = [
     "deepagents>=0.3",
 ]
@@ -56,6 +63,12 @@ mcp = [
 presidio = [
     "presidio-analyzer>=2.2",
     "presidio-anonymizer>=2.2",
+]
+mlflow_genai = [
+    "mlflow>=3.1",
+]
+langsmith = [
+    "langsmith>=0.4",
 ]
 guardrails_ai = [
     "guardrails-ai>=0.6",
@@ -121,5 +134,5 @@ module = ["agent_svc.adapters.llm.litellm_client", "litellm", "litellm.*", "goog
 implicit_reexport = true
 
 [[tool.mypy.overrides]]
-module = ["jsonschema", "jsonschema.*", "llm_guard", "llm_guard.*", "guardrails", "guardrails.*"]
+module = ["jsonschema", "jsonschema.*", "yaml", "llm_guard", "llm_guard.*", "guardrails", "guardrails.*"]
 ignore_missing_imports = true

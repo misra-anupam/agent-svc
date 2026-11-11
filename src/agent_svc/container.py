@@ -38,6 +38,17 @@ from agent_svc.domain.ports import (
 log = structlog.get_logger()
 
 
+def parse_prompt_ref(ref: str) -> tuple[str, str | None, str | None]:
+    """``name`` | ``name:version`` | ``name@alias`` -> (name, version, alias)."""
+    if "@" in ref:
+        name, _, alias = ref.partition("@")
+        return name, None, alias
+    if ":" in ref:
+        name, _, version = ref.partition(":")
+        return name, version, None
+    return ref, None, None
+
+
 class Container:
     def __init__(
         self, settings: Settings, *, extra_resources: list[Resource] | None = None
@@ -55,6 +66,7 @@ class Container:
         self.tools: ToolProvider | None = None
         self._tool_sources: list[ToolProvider] = []
         self._guard_policy: Any = None
+        self.prompt_ref: str | None = None  # e.g. "system:3" when the prompt came from a store
         self.kv: Cache | None = None  # small key/value store (idempotency keys)
         self._extra = extra_resources or []
         self._started: list[Resource] = []
@@ -102,7 +114,20 @@ class Container:
             raise
         log.info("container_ready", orchestrator=s.orchestrator.provider)
 
+    async def _load_prompt(self) -> None:
+        """Replace the system prompt with the store's version (``prompts.ref``), if configured."""
+        ref = self.settings.prompts.ref
+        if not ref:
+            return
+        name, version, alias = parse_prompt_ref(ref)
+        pv = await reg.build_prompt_store(self.settings).get(name, version=version, alias=alias)
+        self.settings = self.settings.model_copy(deep=True)  # never mutate the caller's settings
+        self.settings.orchestrator.system_prompt = pv.template
+        self.prompt_ref = pv.ref
+        log.info("prompt_loaded", ref=pv.ref, requested=ref)
+
     async def _build(self) -> None:
+        await self._load_prompt()
         s = self.settings
         redis = self._redis.client if self._redis and self._redis in self._started else None
         pool = self._pg.pool if self._pg and self._pg in self._started else None

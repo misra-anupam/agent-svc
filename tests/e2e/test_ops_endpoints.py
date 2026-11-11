@@ -29,7 +29,7 @@ async def test_readiness_reports_checks(client: httpx.AsyncClient) -> None:
 
 async def test_agent_info_versioned_route(client: httpx.AsyncClient) -> None:
     r = await client.get("/v1/agent")
-    assert r.json() == {"name": "default", "version": "1.0.0", "api_version": "v1"}
+    assert r.json() == {"name": "default", "version": "1.0.0", "api_version": "v1", "prompt": None}
 
 
 async def test_unknown_route_is_problem_json(client: httpx.AsyncClient) -> None:

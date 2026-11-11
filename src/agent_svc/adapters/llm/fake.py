@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
 from agent_svc.config.settings import Settings
@@ -23,8 +23,11 @@ class FakeLLM:
         delay: float = 0.0,
         fail_after_chunks: int | None = None,
         tool_plan: Sequence[ToolCall] = (),
+        rules: Mapping[str, tuple[str, Sequence[ToolCall]]] | None = None,
     ) -> None:
         self.tool_plan = tuple(tool_plan)
+        # rules: last-user-message text -> (reply, tool plan); lets one fake serve a golden dataset
+        self.rules = dict(rules or {})
         self.name, self.reply, self.delay = name, reply, delay
         self.fail_times = fail_times
         self.error = error or UpstreamError("fake provider failure")
@@ -42,7 +45,8 @@ class FakeLLM:
         self, messages: Sequence[Message], params: dict[str, Any]
     ) -> ToolCall | None:
         """Stateless script: plan[i] is issued until i+1 tool results follow the last user turn."""
-        if not self.tool_plan or not params.get("tools"):
+        plan = self._select(messages)[1]
+        if not plan or not params.get("tools"):
             return None
         done = 0
         for m in reversed(messages):
@@ -50,7 +54,14 @@ class FakeLLM:
                 break
             if m.role == "tool":
                 done += 1
-        return self.tool_plan[done] if done < len(self.tool_plan) else None
+        return plan[done] if done < len(plan) else None
+
+    def _select(self, messages: Sequence[Message]) -> tuple[str, Sequence[ToolCall]]:
+        if self.rules:
+            last = next((m.content for m in reversed(messages) if m.role == "user"), "")
+            if last in self.rules:
+                return self.rules[last]
+        return self.reply, self.tool_plan
 
     @staticmethod
     def _usage(messages: Sequence[Message], text: str) -> Usage:
@@ -65,7 +76,8 @@ class FakeLLM:
         call = self._next_tool_call(messages, params)
         if call:
             return LLMResponse("", self.name, self._usage(messages, ""), tool_calls=(call,))
-        return LLMResponse(self.reply, self.name, self._usage(messages, self.reply))
+        reply = self._select(messages)[0]
+        return LLMResponse(reply, self.name, self._usage(messages, reply))
 
     async def stream(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
@@ -76,14 +88,15 @@ class FakeLLM:
             yield LLMChunk(tool_calls=(call,), model=self.name)
             yield LLMChunk(usage=self._usage(messages, ""), model=self.name)
             return
-        words = self.reply.split()
+        reply = self._select(messages)[0]
+        words = reply.split()
         for i, w in enumerate(words):
             if self.fail_after_chunks is not None and i >= self.fail_after_chunks:
                 raise self.error
             if self.delay:
                 await asyncio.sleep(self.delay)
             yield LLMChunk(delta=w + (" " if i < len(words) - 1 else ""), model=self.name)
-        yield LLMChunk(usage=self._usage(messages, self.reply), model=self.name)
+        yield LLMChunk(usage=self._usage(messages, reply), model=self.name)
 
 
 def build_fake(_settings: Settings, model: str) -> FakeLLM:

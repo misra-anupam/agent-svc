@@ -14,6 +14,9 @@ test:
 test-integration:
 	uv run pytest -q -m integration
 check: lint types arch test
+# Golden-dataset gate: scripted model through the real stack, no API key. Fails on any threshold.
+eval:
+	MLFLOW_DISABLE_AGENT_HINT=1 uv run agent-svc-eval $(EVAL_ARGS)
 run:
 	uv run uvicorn agent_svc.main:app --reload --factory
 up:

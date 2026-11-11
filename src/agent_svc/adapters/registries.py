@@ -14,9 +14,11 @@ from agent_svc.domain.ports import (
     Authenticator,
     Cache,
     Embedder,
+    Evaluator,
     Guardrail,
     LLMClient,
     LongTermMemory,
+    PromptStore,
     RunBuffer,
     ThreadMemory,
     ToolProvider,
@@ -56,6 +58,31 @@ guardrails.register("llm_guard", "agent_svc.adapters.guardrails.llm_guard:build"
 guardrails.register("nemo", "agent_svc.adapters.guardrails.http_rails:build_nemo")
 guardrails.register("llama_guard", "agent_svc.adapters.guardrails.http_rails:build_llama_guard")
 guardrails.register("prompt_guard", "agent_svc.adapters.guardrails.http_rails:build_prompt_guard")
+
+
+# Prompt stores: factory(settings) -> PromptStore
+prompt_stores: Registry[PromptStore] = Registry("prompts")
+prompt_stores.register("file", "agent_svc.adapters.prompts.file:build")
+prompt_stores.register("mlflow", "agent_svc.adapters.prompts.mlflow:build", extra="mlflow_genai")
+prompt_stores.register("langsmith", "agent_svc.adapters.prompts.langsmith:build", extra="langsmith")
+
+# Evaluators: factory(settings) -> Evaluator
+evaluators: Registry[Evaluator] = Registry("eval")
+evaluators.register("local", "agent_svc.adapters.eval.local:build")
+evaluators.register(
+    "mlflow_genai", "agent_svc.adapters.eval.mlflow_genai:build", extra="mlflow_genai"
+)
+evaluators.register("langsmith", "agent_svc.adapters.eval.langsmith:build", extra="langsmith")
+evaluators.register("adk_eval", "agent_svc.adapters.eval.adk_eval:build", extra="adk_eval")
+
+
+def build_prompt_store(settings: Settings) -> PromptStore:
+    from agent_svc.adapters.prompts.cached import CachedPromptStore
+
+    return CachedPromptStore(
+        prompt_stores.create(settings.prompts.provider, settings),
+        settings.prompts.cache_ttl_seconds,
+    )
 
 
 # Tool sources: factory(settings) -> ToolProvider | None (None = not configured)

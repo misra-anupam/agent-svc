@@ -175,3 +175,22 @@ Tasks:
   - Limitations: only the newest user message is checked (history/memory/tool output is trusted, so indirect
     prompt injection through tools is only partially covered by the tool allowlist + output cap). Cached answers
     were output-checked under the policy active when they were cached.
+- **Phase 7**: done. `PromptStore` port (`get` latest/version/alias, `register`, `set_alias`) with `file`
+  (git-friendly, path-traversal-safe, atomic writes), `mlflow` (Prompt Registry) and `langsmith` adapters behind a
+  TTL cache (pinned versions cache forever; aliases/latest expire). `prompts.ref` (`name@alias`) loads the system
+  prompt at startup (settings are copied, never mutated); `/v1/agent` reports `prompt: "name:version"`. Evaluator port
+  now takes recorded runs (`EvalRecord`) and `Threshold(min,max)`; shared pure scoring (`domain/scoring.py`) so every
+  evaluator reports the same `answer_match`, `tool_trajectory`, `error_expectation` and operational metrics.
+  Evaluators: `local` (deterministic, no deps), `mlflow_genai` (`mlflow.genai.evaluate` run tagged with agent version +
+  gate result), `langsmith` (`langsmith.evaluate`, local by default), `adk_eval` (ADK `TrajectoryEvaluator` + ROUGE).
+  `GoldenRunner` replays `evals/golden/*.jsonl` through the real stack; `agent-svc-eval` / `make eval` gates on
+  `evals/golden/thresholds.yaml` (exit 1 on violation) and writes a JSON report; CI runs it.
+  - **What the CI gate does and does not prove**: it uses a scripted model (`metadata.simulate`), so it guards routing,
+    tool trajectories, guardrails and the answer contract, *not model quality*. Use `--real --exclude-tags simulate-only`
+    against a configured model for that.
+  - **Verified**: all four evaluators run the shipped dataset and agree on the core metrics; MLflow prompt registry and
+    `mlflow.genai.evaluate` run offline against a sqlite store; the gate returns 1 for a violated threshold and for a
+    simulated tool-routing regression.
+  - **Not verified**: LangSmith prompt store and `langsmith_upload=true` (need an account; stubbed in tests); the MLflow
+    LLM judge (`evaluation.judge_model`, needs model credentials); ADK evaluators only get tool names, not arguments.
+  - Note: the settings field is `evaluation` (env `AGENT_EVALUATION__*`), the CLI is `agent-svc-eval`.

@@ -1,0 +1,6 @@
+# Quality gate for `make eval`. A thresholded metric that cannot be computed fails the gate.
+answer_match: {min: 1.0}
+tool_trajectory: {min: 1.0}
+error_expectation: {min: 1.0}   # blocked prompts must be blocked; everything else must succeed
+unexpected_error_rate: {max: 0.0}
+latency_p95_ms: {max: 5000}
