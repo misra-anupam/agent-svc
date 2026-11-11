@@ -18,6 +18,7 @@ nav:
   - How-to:
       - Add an adapter: how-to/add-adapter.md
       - Golden dataset & evals: how-to/evals.md
+      - Developer scripts: how-to/scripts.md
   - Operations:
       - Runbook: ops/runbook.md
   - Security: security.md
