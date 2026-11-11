@@ -1,0 +1,3 @@
+apiVersion: 1
+providers:
+  - {name: agent-svc, folder: agent-svc, type: file, options: {path: /var/lib/grafana/dashboards}}

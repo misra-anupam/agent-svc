@@ -1,3 +1,6 @@
+# Profiles: otel | lgtm | mlflow | langfuse   e.g.  docker compose --profile lgtm --profile mlflow up
+# Pick the tracer with AGENT_TRACING__PROVIDER and install its extra via AGENT_EXTRAS, e.g.
+#   AGENT_EXTRAS="--extra litellm --extra langgraph --extra otel" docker compose --profile otel up --build
 name: agent-svc
 services:
   api:
@@ -5,11 +8,19 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        EXTRAS: ${AGENT_EXTRAS:-}
+        EXTRAS: ${AGENT_EXTRAS:---extra litellm --extra langgraph --extra otel --extra mlflow --extra langfuse}
     env_file: [../env/local-min.env]
     environment:
       AGENT_REDIS__URL: redis://redis:6379/0
       AGENT_POSTGRES__DSN: postgresql://agent:agent@postgres:5432/agent
+      AGENT_TRACING__PROVIDER: ${AGENT_TRACING__PROVIDER:-none}
+      AGENT_TRACING__OTLP_ENDPOINT: ${AGENT_TRACING__OTLP_ENDPOINT:-}
+      AGENT_TRACING__MLFLOW_TRACKING_URI: ${AGENT_TRACING__MLFLOW_TRACKING_URI:-}
+      AGENT_TRACING__LANGFUSE_HOST: ${AGENT_TRACING__LANGFUSE_HOST:-}
+      AGENT_TRACING__LANGFUSE_PUBLIC_KEY: ${AGENT_TRACING__LANGFUSE_PUBLIC_KEY:-}
+      AGENT_TRACING__LANGFUSE_SECRET_KEY: ${AGENT_TRACING__LANGFUSE_SECRET_KEY:-}
+      AGENT_ORCHESTRATOR__PROVIDER: ${AGENT_ORCHESTRATOR__PROVIDER:-echo}
+      AGENT_LLM__PROVIDER: ${AGENT_LLM__PROVIDER:-litellm}
     ports: ["8000:8000"]
     depends_on:
       redis: {condition: service_healthy}
@@ -17,16 +28,149 @@ services:
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10}
     volumes: [redis-data:/data]
+
   postgres:
     image: pgvector/pgvector:pg16
     environment: {POSTGRES_USER: agent, POSTGRES_PASSWORD: agent, POSTGRES_DB: agent}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U agent"], interval: 5s, timeout: 3s, retries: 10}
     volumes: [pg-data:/var/lib/postgresql/data]
+
+  # ---- profile: otel (OpenTelemetry Collector -> Jaeger UI on :16686) -------------------------
+  otel-collector:
+    profiles: [otel]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes: [./otel-collector.yaml:/etc/otel/config.yaml:ro]
+    depends_on: [jaeger]
+  jaeger:
+    profiles: [otel]
+    image: jaegertracing/all-in-one:1.62.0
+    environment: {COLLECTOR_OTLP_ENABLED: "true"}
+    ports: ["16686:16686"]
+
+  # ---- profile: lgtm (Prometheus + Grafana + Loki + Promtail; Grafana on :3000) ---------------
+  prometheus:
+    profiles: [lgtm]
+    image: prom/prometheus:v2.55.1
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["9090:9090"]
+  loki:
+    profiles: [lgtm]
+    image: grafana/loki:3.2.1
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes: [./loki.yaml:/etc/loki/loki.yaml:ro, loki-data:/loki]
+  promtail:
+    profiles: [lgtm]
+    image: grafana/promtail:3.2.1
+    command: ["-config.file=/etc/promtail/promtail.yaml"]
+    volumes:
+      - ./promtail.yaml:/etc/promtail/promtail.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on: [loki]
+  grafana:
+    profiles: [lgtm]
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus, loki]
+
+  # ---- profile: mlflow (tracking server + traces UI on :5000) ---------------------------------
+  mlflow:
+    profiles: [mlflow]
+    image: ghcr.io/mlflow/mlflow:v3.1.1
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --serve-artifacts --artifacts-destination /mlflow/artifacts
+      --default-artifact-root mlflow-artifacts:/
+    volumes: [mlflow-data:/mlflow]
+    ports: ["5001:5000"]  # 5000 is taken by AirPlay on macOS
+
+  # ---- profile: langfuse (v3 self-hosted, dev credentials only; UI on :3001) ------------------
+  langfuse-web:
+    profiles: [langfuse]
+    image: langfuse/langfuse:3
+    depends_on: [langfuse-db, langfuse-clickhouse, langfuse-redis, langfuse-minio]
+    ports: ["3001:3000"]
+    environment: &lf-env
+      DATABASE_URL: postgresql://lf:lf@langfuse-db:5432/lf
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: dev-only-nextauth-secret
+      SALT: dev-only-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_HOST: langfuse-redis
+      REDIS_AUTH: lfredis
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_INIT_ORG_ID: dev-org
+      LANGFUSE_INIT_PROJECT_ID: dev-project
+      LANGFUSE_INIT_PROJECT_NAME: agent-svc
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-dev
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-dev
+      LANGFUSE_INIT_USER_EMAIL: dev@example.com
+      LANGFUSE_INIT_USER_NAME: dev
+      LANGFUSE_INIT_USER_PASSWORD: devpassword
+      TELEMETRY_ENABLED: "false"
+  langfuse-worker:
+    profiles: [langfuse]
+    image: langfuse/langfuse-worker:3
+    depends_on: [langfuse-db, langfuse-clickhouse, langfuse-redis, langfuse-minio]
+    environment: *lf-env
+  langfuse-db:
+    profiles: [langfuse]
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: lf, POSTGRES_PASSWORD: lf, POSTGRES_DB: lf}
+    volumes: [lf-pg:/var/lib/postgresql/data]
+  langfuse-clickhouse:
+    profiles: [langfuse]
+    image: clickhouse/clickhouse-server:24.10
+    environment: {CLICKHOUSE_USER: clickhouse, CLICKHOUSE_PASSWORD: clickhouse}
+    volumes: [lf-ch:/var/lib/clickhouse]
+  langfuse-redis:
+    profiles: [langfuse]
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "lfredis"]
+  # Docker Hub's minio/minio is no longer published; Chainguard's build is distroless (no shell),
+  # so a one-shot busybox job pre-creates the bucket directory on the shared volume.
+  langfuse-minio-init:
+    profiles: [langfuse]
+    image: busybox:1.37
+    command: ["sh", "-c", "mkdir -p /data/langfuse && chown -R 65532:65532 /data"]  # minio runs as nonroot
+    volumes: [lf-minio:/data]
+  langfuse-minio:
+    profiles: [langfuse]
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data"]
+    depends_on:
+      langfuse-minio-init: {condition: service_completed_successfully}
+    environment: {MINIO_ROOT_USER: minio, MINIO_ROOT_PASSWORD: miniosecret}
+    volumes: [lf-minio:/data]
+
 volumes:
   redis-data:
   pg-data:
+  loki-data:
+  mlflow-data:
+  lf-pg:
+  lf-ch:
+  lf-minio:

@@ -134,3 +134,14 @@ Tasks:
 - **Phase 5 note**: heavy framework extras (adk, deepagents, maf, crewai) are not in `pyproject.toml`
   yet; `agent-framework` failed to resolve against the base lock, so conflicts are handled when
   that phase starts.
+- **Phase 4**: done. `Tracer` port with `none | otel | mlflow | langfuse` adapters and a backend-neutral
+  `TracedRunner` (run -> step -> llm span tree, token/cost attributes, prompts/answers captured only when
+  `capture_content=true`). Compose profiles `otel` (collector + Jaeger), `lgtm` (Prometheus, Loki, Promtail,
+  Grafana with a provisioned dashboard), `mlflow`, `langfuse`. **Verified live**: one request produced a
+  trace in Jaeger, MLflow and Langfuse; Prometheus scraped metrics; Loki received JSON logs; Grafana
+  provisioned the dashboard.
+  - Environment notes: Docker Hub's `minio/minio` is gone, so the Langfuse profile uses Chainguard's MinIO
+    with a busybox init job (volume ownership 65532). MLflow is published on host port 5001 because macOS
+    AirPlay owns 5000. Compose here is the standalone `docker-compose` binary (Makefile auto-detects).
+  - Not verified visually: the Grafana panels were provisioned and queried through the datasource proxy,
+    but I did not open the dashboard in a browser.

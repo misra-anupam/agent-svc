@@ -14,6 +14,7 @@ from agent_svc.domain.ports import (
     LongTermMemory,
     RunBuffer,
     ThreadMemory,
+    Tracer,
     UserMemory,
 )
 from agent_svc.registry import Registry
@@ -36,6 +37,12 @@ orchestrators.register(
 orchestrators.register("maf", "agent_svc.adapters.orchestrators.maf:build", extra="maf")
 orchestrators.register("crewai", "agent_svc.adapters.orchestrators.crewai:build", extra="crewai")
 
+
+tracers: Registry[Tracer] = Registry("tracing")
+tracers.register("none", "agent_svc.adapters.tracing.noop:build")
+tracers.register("otel", "agent_svc.adapters.tracing.otel:build", extra="otel")
+tracers.register("mlflow", "agent_svc.adapters.tracing.mlflow:build", extra="mlflow")
+tracers.register("langfuse", "agent_svc.adapters.tracing.langfuse:build", extra="langfuse")
 
 # --- state, protection, auth: factories take (settings, infra) ---------------------------------
 authenticators: Registry[Authenticator] = Registry("auth")

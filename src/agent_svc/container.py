@@ -14,6 +14,7 @@ from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.infra.postgres import PostgresResource
 from agent_svc.adapters.infra.redis import RedisResource
 from agent_svc.adapters.infra.schema import ensure_schema
+from agent_svc.adapters.tracing.traced_runner import TracedRunner
 from agent_svc.application.admission import AdmissionService
 from agent_svc.application.memory_facade import MemoryFacade
 from agent_svc.config.settings import Settings
@@ -27,6 +28,7 @@ from agent_svc.domain.ports import (
     ReadinessReport,
     Resource,
     RunBuffer,
+    Tracer,
 )
 
 log = structlog.get_logger()
@@ -45,6 +47,7 @@ class Container:
         self.admission: AdmissionService | None = None
         self.memory: MemoryFacade = MemoryFacade(settings.memory)
         self.run_buffer: RunBuffer | None = None
+        self.tracer: Tracer | None = None
         self.kv: Cache | None = None  # small key/value store (idempotency keys)
         self._extra = extra_resources or []
         self._started: list[Resource] = []
@@ -101,7 +104,8 @@ class Container:
         runner = reg.build_runner(s, base_llm)
         if s.cache.provider != "none":
             runner = CachedRunner(runner, reg.caches.create(s.cache.provider, s, infra), s.cache)
-        self.runner = runner
+        self.tracer = reg.tracers.create(s.tracing.provider, s)
+        self.runner = TracedRunner(runner, self.tracer, s.tracing)  # outermost: sees cache hits too
 
         backend = None
         if s.ratelimit.provider != "none":
@@ -144,6 +148,10 @@ class Container:
         self.kv = RedisCache(redis, "kv") if redis is not None else InMemoryCache()
 
     async def stop(self) -> None:
+        if self.tracer is not None:
+            with suppress(Exception):
+                await asyncio.wait_for(self.tracer.shutdown(), timeout=10)  # flush spans
+            self.tracer = None
         for res in reversed(self._started):  # reverse-order teardown
             with suppress(Exception):
                 await asyncio.wait_for(res.stop(), timeout=self.settings.app.shutdown_grace_seconds)

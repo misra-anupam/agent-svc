@@ -1,6 +1,8 @@
+COMPOSE ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo docker-compose)
+PROFILES ?=
 .PHONY: test-integration install check lint types arch test run up docs
 install:
-	uv sync --group dev --extra litellm --extra langgraph
+	uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow
 lint:
 	uv run ruff check . && uv run ruff format --check .
 types:
@@ -15,6 +17,6 @@ check: lint types arch test
 run:
 	uv run uvicorn agent_svc.main:app --reload --factory
 up:
-	docker compose -f docker/compose.yaml up --build
+	$(COMPOSE) -f docker/compose.yaml $(PROFILES) up --build
 docs:
 	uv run mkdocs serve

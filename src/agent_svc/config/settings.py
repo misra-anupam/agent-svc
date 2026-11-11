@@ -63,8 +63,20 @@ class OrchestratorSettings(BaseModel):
 
 class TracingSettings(BaseModel):
     provider: Literal["none", "otel", "mlflow", "langfuse"] = "none"
-    otlp_endpoint: str | None = None
     service_name: str = "agent-svc"
+    # Prompts/answers are NOT recorded unless explicitly enabled (privacy / OWASP LLM02).
+    capture_content: bool = False
+    # otel
+    otlp_endpoint: str | None = None  # e.g. http://otel-collector:4318
+    otlp_headers: dict[str, str] = Field(default_factory=dict)
+    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    # mlflow
+    mlflow_tracking_uri: str | None = None
+    mlflow_experiment: str = "agent-svc"
+    # langfuse
+    langfuse_host: str | None = None
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
 
 
 class PromptStoreSettings(BaseModel):

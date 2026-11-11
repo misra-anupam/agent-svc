@@ -57,6 +57,8 @@ class RequestContextMiddleware:
         finally:
             HTTP_INFLIGHT.dec()
             route = getattr(scope.get("route"), "path", "unmatched")
+            if scope["path"].startswith("/metrics"):  # mounted ASGI app: no APIRoute
+                route = "/metrics"
             elapsed = time.perf_counter() - start
             HTTP_REQUESTS.labels(req.method, route, str(status)).inc()
             HTTP_LATENCY.labels(req.method, route).observe(elapsed)
