@@ -31,5 +31,5 @@ class EchoRunner:
         yield RunCompleted(run_id=request.run_id)
 
 
-def build_echo(_settings: Settings, _llm: object = None) -> EchoRunner:
+def build_echo(_settings: Settings, _llm: object = None, _tools: object = None) -> EchoRunner:
     return EchoRunner()

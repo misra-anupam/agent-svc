@@ -13,6 +13,7 @@ from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.adapters.llm.stack import build_llm_stack
 from agent_svc.config import Settings
 from agent_svc.container import Container
+from agent_svc.domain.models import ToolCall
 from agent_svc.main import create_app
 
 
@@ -54,13 +55,18 @@ def make_client(
     settings.llm.primary_model = "fake/primary"
     settings.llm.secondary_model = "fake/secondary"
     settings.llm.max_retries = 2
+    settings.tools.local = ["calculator"]
 
     @asynccontextmanager
     async def _make(
         fakes: dict[str, FakeLLM] | None = None, *, redis: bool = False
     ) -> AsyncIterator[httpx.AsyncClient]:
         llms = fakes or {
-            "fake/primary": FakeLLM("fake/primary", reply="the quick brown fox"),
+            "fake/primary": FakeLLM(
+                "fake/primary",
+                reply="the quick brown fox",
+                tool_plan=[ToolCall("c1", "calculator", {"expression": "2+3"})],
+            ),
             "fake/secondary": FakeLLM("fake/secondary"),
         }
         monkeypatch.setattr(

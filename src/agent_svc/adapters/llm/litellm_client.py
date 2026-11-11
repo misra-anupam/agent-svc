@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Any
 
@@ -11,7 +12,7 @@ from agent_svc.domain.exceptions import (
     UpstreamError,
     UpstreamTimeoutError,
 )
-from agent_svc.domain.models import Message, Usage
+from agent_svc.domain.models import Message, ToolCall, Usage
 from agent_svc.domain.ports import LLMChunk, LLMResponse
 
 Completion = Callable[..., Awaitable[Any]]
@@ -45,6 +46,27 @@ def _usage(raw: Any, model: str) -> Usage:
     )
 
 
+def _args(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _parse_call(c: Any) -> ToolCall:
+    return ToolCall(str(c.id), str(c.function.name), _args(c.function.arguments))
+
+
+def _finish_calls(partial: dict[int, dict[str, str]]) -> tuple[ToolCall, ...]:
+    return tuple(
+        ToolCall(v["id"] or f"call_{i}", v["name"], _args(v["args"]))
+        for i, v in sorted(partial.items())
+    )
+
+
 class LiteLLMClient:
     def __init__(
         self, model: str, *, timeout: float = 60.0, completion: Completion | None = None
@@ -62,8 +84,25 @@ class LiteLLMClient:
         return fn
 
     @staticmethod
-    def _payload(messages: Sequence[Message]) -> list[dict[str, str]]:
-        return [{"role": m.role, "content": m.content} for m in messages]
+    def _payload(messages: Sequence[Message]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for m in messages:
+            d: dict[str, Any] = {"role": m.role, "content": m.content}
+            if m.tool_calls:
+                d["tool_calls"] = [
+                    {
+                        "id": c.id,
+                        "type": "function",
+                        "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+                    }
+                    for c in m.tool_calls
+                ]
+            if m.tool_call_id:
+                d["tool_call_id"] = m.tool_call_id
+            if m.name and m.role == "tool":
+                d["name"] = m.name
+            out.append(d)
+        return out
 
     async def complete(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
@@ -77,8 +116,11 @@ class LiteLLMClient:
             raise
         except Exception as exc:
             raise map_litellm_error(exc) from exc
-        text = resp.choices[0].message.content or ""
-        return LLMResponse(text=text, model=used, usage=_usage(resp, used))
+        msg = resp.choices[0].message
+        calls = tuple(_parse_call(c) for c in (getattr(msg, "tool_calls", None) or []))
+        return LLMResponse(
+            text=msg.content or "", model=used, usage=_usage(resp, used), tool_calls=calls
+        )
 
     async def stream(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
@@ -93,13 +135,31 @@ class LiteLLMClient:
                 stream_options={"include_usage": True},
                 **params,
             )
+            partial: dict[int, dict[str, str]] = {}  # tool-call deltas arrive in fragments
             async for part in resp:
                 delta = ""
                 if part.choices:
-                    delta = part.choices[0].delta.content or ""
+                    d = part.choices[0].delta
+                    delta = d.content or ""
+                    for tc in getattr(d, "tool_calls", None) or []:
+                        slot = partial.setdefault(
+                            int(getattr(tc, "index", 0) or 0), {"id": "", "name": "", "args": ""}
+                        )
+                        slot["id"] = getattr(tc, "id", None) or slot["id"]
+                        fn = getattr(tc, "function", None)
+                        if fn is not None:
+                            slot["name"] += getattr(fn, "name", None) or ""
+                            slot["args"] += getattr(fn, "arguments", None) or ""
                 usage = _usage(part, used) if getattr(part, "usage", None) else None
-                if delta or usage:
+                if usage:  # emit accumulated tool calls before the closing usage chunk
+                    if partial:
+                        yield LLMChunk(tool_calls=_finish_calls(partial), model=used)
+                        partial = {}
                     yield LLMChunk(delta=delta, usage=usage, model=used)
+                elif delta:
+                    yield LLMChunk(delta=delta, model=used)
+            if partial:
+                yield LLMChunk(tool_calls=_finish_calls(partial), model=used)
         except DomainError:
             raise
         except Exception as exc:

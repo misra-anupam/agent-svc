@@ -14,6 +14,7 @@ from agent_svc.adapters.infra import Infra
 from agent_svc.adapters.infra.postgres import PostgresResource
 from agent_svc.adapters.infra.redis import RedisResource
 from agent_svc.adapters.infra.schema import ensure_schema
+from agent_svc.adapters.tools.composite import CompositeToolProvider, GuardedToolProvider
 from agent_svc.adapters.tracing.traced_runner import TracedRunner
 from agent_svc.application.admission import AdmissionService
 from agent_svc.application.memory_facade import MemoryFacade
@@ -28,6 +29,7 @@ from agent_svc.domain.ports import (
     ReadinessReport,
     Resource,
     RunBuffer,
+    ToolProvider,
     Tracer,
 )
 
@@ -48,6 +50,8 @@ class Container:
         self.memory: MemoryFacade = MemoryFacade(settings.memory)
         self.run_buffer: RunBuffer | None = None
         self.tracer: Tracer | None = None
+        self.tools: ToolProvider | None = None
+        self._tool_sources: list[ToolProvider] = []
         self.kv: Cache | None = None  # small key/value store (idempotency keys)
         self._extra = extra_resources or []
         self._started: list[Resource] = []
@@ -67,6 +71,10 @@ class Container:
         if s.postgres.enabled:
             self._pg = PostgresResource(s.postgres)
             self._register(self._pg)
+        self._tool_sources = reg.build_tool_sources(s)  # constructed now, connected below
+        for src in self._tool_sources:
+            if isinstance(src, Resource):
+                self._register(src)
         for res in self._extra:
             if isinstance(res, RedisResource) and self._redis is None:
                 self._redis = res
@@ -101,7 +109,13 @@ class Container:
 
         base_llm = reg.build_llm(s)
         self.llm = base_llm
-        runner = reg.build_runner(s, base_llm)
+        self.tools = GuardedToolProvider(
+            CompositeToolProvider(self._tool_sources),
+            allowlist=s.tools.allowlist,
+            timeout_seconds=s.tools.timeout_seconds,
+            max_result_chars=s.tools.max_result_chars,
+        )
+        runner = reg.build_runner(s, base_llm, self.tools)
         if s.cache.provider != "none":
             runner = CachedRunner(runner, reg.caches.create(s.cache.provider, s, infra), s.cache)
         self.tracer = reg.tracers.create(s.tracing.provider, s)

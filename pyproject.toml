@@ -16,6 +16,7 @@ dependencies = [
   "tenacity>=9.0",
   "prometheus-client>=0.20",
   "pyjwt[crypto]>=2.9",
+  "jsonschema>=4.26.0",
 ]
 
 [project.optional-dependencies]
@@ -23,8 +24,9 @@ litellm = [
     "litellm>=1.50",
 ]
 langgraph = [
-    "langchain-core>=0.3",
     "langgraph>=0.2",
+    "langchain>=1.0",
+    "langchain-core>=0.3",
 ]
 otel = [
     "opentelemetry-exporter-otlp-proto-http>=1.27",
@@ -36,9 +38,23 @@ langfuse = [
 mlflow = [
     "mlflow-tracing>=3.0",
 ]
+adk = [
+    "google-adk>=1.0",
+]
+deepagents = [
+    "deepagents>=0.3",
+]
+crewai = [
+    "crewai>=1.0",
+]
+maf = [
+    "agent-framework-core>=1.20",
+]
+mcp = [
+    "mcp>=1.0",
+]
 
-# Optional extras (litellm, langgraph, adk, deepagents, maf, crewai, mlflow, langfuse, ...)
-# are added in the phase that implements each adapter, with uv conflict declarations.
+# Guardrail / prompt-store / evaluator extras are added in the phase that implements each adapter.
 
 [dependency-groups]
 dev = [
@@ -94,5 +110,9 @@ module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["agent_svc.adapters.llm.litellm_client"]
+module = ["agent_svc.adapters.llm.litellm_client", "litellm", "litellm.*", "google.adk", "google.adk.*"]
 implicit_reexport = true
+
+[[tool.mypy.overrides]]
+module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true

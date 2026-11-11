@@ -22,7 +22,7 @@ from agent_svc.domain.ports.ratelimit import (
     TokenBudget,
 )
 from agent_svc.domain.ports.runs import RunBuffer
-from agent_svc.domain.ports.tools import ToolProvider
+from agent_svc.domain.ports.tools import ToolProvider, step_kind_for
 from agent_svc.domain.ports.tracing import Span, Tracer
 
 __all__ = [
@@ -56,4 +56,5 @@ __all__ = [
     "ToolProvider",
     "Tracer",
     "UserMemory",
+    "step_kind_for",
 ]

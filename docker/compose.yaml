@@ -1,4 +1,4 @@
-# Profiles: otel | lgtm | mlflow | langfuse   e.g.  docker compose --profile lgtm --profile mlflow up
+# Profiles: otel | lgtm | mlflow | langfuse | mcp-demo   e.g.  docker compose --profile lgtm --profile mlflow up
 # Pick the tracer with AGENT_TRACING__PROVIDER and install its extra via AGENT_EXTRAS, e.g.
 #   AGENT_EXTRAS="--extra litellm --extra langgraph --extra otel" docker compose --profile otel up --build
 name: agent-svc
@@ -21,6 +21,10 @@ services:
       AGENT_TRACING__LANGFUSE_SECRET_KEY: ${AGENT_TRACING__LANGFUSE_SECRET_KEY:-}
       AGENT_ORCHESTRATOR__PROVIDER: ${AGENT_ORCHESTRATOR__PROVIDER:-echo}
       AGENT_LLM__PROVIDER: ${AGENT_LLM__PROVIDER:-litellm}
+      # MCP: see the mcp-demo profile for a ready-made server (needs `--extra mcp` in AGENT_EXTRAS)
+      AGENT_MCP__SERVERS: ${AGENT_MCP__SERVERS:-[]}
+      AGENT_MCP__ALLOWED_HOSTS: ${AGENT_MCP__ALLOWED_HOSTS:-[]}
+      AGENT_TOOLS__LOCAL: ${AGENT_TOOLS__LOCAL:-["calculator","current_time"]}
     ports: ["8000:8000"]
     depends_on:
       redis: {condition: service_healthy}
@@ -40,6 +44,18 @@ services:
     environment: {POSTGRES_USER: agent, POSTGRES_PASSWORD: agent, POSTGRES_DB: agent}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U agent"], interval: 5s, timeout: 3s, retries: 10}
     volumes: [pg-data:/var/lib/postgresql/data]
+
+  # ---- profile: mcp-demo (FastMCP server on :8080 with add/boom/big tools) --------------------
+  # AGENT_EXTRAS="--extra litellm --extra langgraph --extra mcp" \
+  # AGENT_ORCHESTRATOR__PROVIDER=langgraph \
+  # AGENT_MCP__SERVERS='[{"name":"demo","transport":"streamable_http","url":"http://mcp-demo:8080/mcp"}]' \
+  # AGENT_MCP__ALLOWED_HOSTS='["mcp-demo"]' docker compose --profile mcp-demo up --build
+  mcp-demo:
+    profiles: [mcp-demo]
+    image: python:3.12-slim
+    command: ["sh", "-c", "pip install --no-cache-dir 'mcp>=1.0' && python /srv/mcp_server.py streamable-http 8080"]
+    volumes: [../tests/fixtures/mcp_server.py:/srv/mcp_server.py:ro]
+    expose: ["8080"]
 
   # ---- profile: otel (OpenTelemetry Collector -> Jaeger UI on :16686) -------------------------
   otel-collector:

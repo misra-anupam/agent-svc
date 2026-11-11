@@ -10,7 +10,8 @@ from tenacity import (
     before_sleep_log,
     retry_if_exception,
     stop_after_attempt,
-    wait_exponential_jitter,
+    wait_exponential,
+    wait_random,
 )
 
 from agent_svc.domain.exceptions import DomainError
@@ -38,7 +39,8 @@ def make_retrying(
     return AsyncRetrying(
         retry=retry_if_exception(is_retryable),
         stop=stop_after_attempt(max_attempts),
-        wait=wait_exponential_jitter(multiplier=initial, max=max_wait),
+        # exponential backoff + jitter, spelled so it works across tenacity 9.1 and 9.2+
+        wait=wait_exponential(multiplier=initial, max=max_wait) + wait_random(0, initial),
         before_sleep=before_sleep,
         reraise=True,
     )

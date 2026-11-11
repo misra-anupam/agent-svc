@@ -90,6 +90,18 @@ class UnavailableError(DomainError):
     retryable = True
 
 
+class IterationLimitError(DomainError):
+    """The agent loop hit ``orchestrator.max_iterations`` (runaway protection, OWASP LLM10)."""
+
+    status_code, code, title = 422, "iteration_limit", "Iteration Limit Exceeded"
+
+
+class ToolExecutionError(DomainError):
+    """A tool failed or timed out. Surfaced to the model as text so the agent can recover."""
+
+    status_code, code, title = 502, "tool_error", "Tool Error"
+
+
 class CircuitOpenError(UnavailableError):
     """Fail-fast: breaker is open. Not worth retrying against the same provider."""
 

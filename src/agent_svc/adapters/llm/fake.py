@@ -8,7 +8,7 @@ from typing import Any
 
 from agent_svc.config.settings import Settings
 from agent_svc.domain.exceptions import DomainError, UpstreamError
-from agent_svc.domain.models import Message, Usage
+from agent_svc.domain.models import Message, ToolCall, Usage
 from agent_svc.domain.ports import LLMChunk, LLMResponse
 
 
@@ -22,7 +22,9 @@ class FakeLLM:
         error: DomainError | None = None,
         delay: float = 0.0,
         fail_after_chunks: int | None = None,
+        tool_plan: Sequence[ToolCall] = (),
     ) -> None:
+        self.tool_plan = tuple(tool_plan)
         self.name, self.reply, self.delay = name, reply, delay
         self.fail_times = fail_times
         self.error = error or UpstreamError("fake provider failure")
@@ -36,6 +38,20 @@ class FakeLLM:
         if self.fail_times == -1 or self.calls <= self.fail_times:
             raise self.error
 
+    def _next_tool_call(
+        self, messages: Sequence[Message], params: dict[str, Any]
+    ) -> ToolCall | None:
+        """Stateless script: plan[i] is issued until i+1 tool results follow the last user turn."""
+        if not self.tool_plan or not params.get("tools"):
+            return None
+        done = 0
+        for m in reversed(messages):
+            if m.role == "user":
+                break
+            if m.role == "tool":
+                done += 1
+        return self.tool_plan[done] if done < len(self.tool_plan) else None
+
     @staticmethod
     def _usage(messages: Sequence[Message], text: str) -> Usage:
         return Usage(sum(len(m.content.split()) for m in messages), len(text.split()))
@@ -46,12 +62,20 @@ class FakeLLM:
         self._maybe_fail(messages)
         if self.delay:
             await asyncio.sleep(self.delay)
+        call = self._next_tool_call(messages, params)
+        if call:
+            return LLMResponse("", self.name, self._usage(messages, ""), tool_calls=(call,))
         return LLMResponse(self.reply, self.name, self._usage(messages, self.reply))
 
     async def stream(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
     ) -> AsyncIterator[LLMChunk]:
         self._maybe_fail(messages)
+        call = self._next_tool_call(messages, params)
+        if call:
+            yield LLMChunk(tool_calls=(call,), model=self.name)
+            yield LLMChunk(usage=self._usage(messages, ""), model=self.name)
+            return
         words = self.reply.split()
         for i, w in enumerate(words):
             if self.fail_after_chunks is not None and i >= self.fail_after_chunks:

@@ -32,7 +32,7 @@ async def test_request_produces_one_trace_with_run_step_and_llm_spans(
     names = {s.name for s in spans}
     assert (
         "agent.run" in names
-        and "agent:respond" in names
+        and "tool:calculator" in names
         and any(n.startswith("llm:") for n in names)
     )
     assert len({s.context.trace_id for s in spans}) == 1  # single trace

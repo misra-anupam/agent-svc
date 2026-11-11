@@ -67,9 +67,18 @@ async def _noop() -> None:
 
 
 @pytest.mark.parametrize("provider", ["adk"])
-async def test_missing_extra_fails_startup_clearly(settings: Settings, provider: str) -> None:
+async def test_missing_extra_fails_startup_clearly(
+    settings: Settings, provider: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agent_svc.adapters import registries as reg
     from agent_svc.domain.exceptions import ConfigurationError
 
+    # every extra is installed in dev, so simulate the SDK being absent
+    monkeypatch.setitem(
+        reg.orchestrators._factories,
+        provider,
+        ("agent_svc.adapters.orchestrators._absent_sdk:build", provider),
+    )
     settings.orchestrator.provider = provider  # type: ignore[assignment]
     app = create_app(settings)
     with pytest.raises(ConfigurationError, match="uv sync --extra adk"):

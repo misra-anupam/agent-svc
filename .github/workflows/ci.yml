@@ -6,5 +6,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow
+      - run: uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow --extra adk --extra deepagents --extra maf --extra crewai --extra mcp
       - run: make check
+
+  # Each orchestrator extra must work with only core + its own deps (no hidden cross-imports).
+  orchestrator-isolation:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {provider: langgraph, extras: "--extra langgraph"}
+          - {provider: deepagents, extras: "--extra langgraph --extra deepagents"}
+          - {provider: adk, extras: "--extra adk"}
+          - {provider: maf, extras: "--extra maf"}
+          - {provider: crewai, extras: "--extra crewai"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev --extra litellm ${{ matrix.extras }}
+      - run: uv run pytest tests/contract/test_orchestrator_contract.py -q
+        env:
+          CONTRACT_PROVIDERS: ${{ matrix.provider }}

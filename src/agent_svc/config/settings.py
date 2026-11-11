@@ -59,6 +59,15 @@ class LLMSettings(BaseModel):
 
 class OrchestratorSettings(BaseModel):
     provider: Literal["langgraph", "adk", "deepagents", "maf", "crewai", "echo"] = "echo"
+    system_prompt: str = "You are a helpful assistant. Use tools when they help."
+    max_iterations: int = 8  # cap on model/tool loops per run (OWASP LLM10)
+
+
+class ToolsSettings(BaseModel):
+    local: list[Literal["calculator", "current_time"]] = []
+    allowlist: list[str] | None = None  # glob patterns; None = every discovered tool
+    timeout_seconds: float = 30.0
+    max_result_chars: int = 8_000
 
 
 class TracingSettings(BaseModel):
@@ -172,7 +181,10 @@ class McpServerConfig(BaseModel):
 
 class McpSettings(BaseModel):
     servers: list[McpServerConfig] = Field(default_factory=list)
+    # HTTP MCP servers must be listed here (SSRF guard). Hostnames only, e.g. "mcp-demo".
     allowed_hosts: list[str] = Field(default_factory=list)
+    connect_timeout_seconds: float = 15.0
+    required: bool = False  # True: a server that cannot connect fails startup
 
 
 class Settings(BaseSettings):
@@ -196,6 +208,7 @@ class Settings(BaseSettings):
     cache: CacheSettings = Field(default_factory=CacheSettings)
     ratelimit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    tools: ToolsSettings = Field(default_factory=ToolsSettings)
     mcp: McpSettings = Field(default_factory=McpSettings)
 
 

@@ -131,9 +131,6 @@ Tasks:
   - **Deferred**: the *semantic* answer cache (`CacheSettings.semantic` is reserved, not implemented).
     Exact-match caching is shipped. Plan: implement on top of `Embedder` + pgvector in Phase 8.
   - **Not yet run**: full `docker compose up` smoke with Redis and Postgres (done in Phase 8).
-- **Phase 5 note**: heavy framework extras (adk, deepagents, maf, crewai) are not in `pyproject.toml`
-  yet; `agent-framework` failed to resolve against the base lock, so conflicts are handled when
-  that phase starts.
 - **Phase 4**: done. `Tracer` port with `none | otel | mlflow | langfuse` adapters and a backend-neutral
   `TracedRunner` (run -> step -> llm span tree, token/cost attributes, prompts/answers captured only when
   `capture_content=true`). Compose profiles `otel` (collector + Jaeger), `lgtm` (Prometheus, Loki, Promtail,
@@ -145,3 +142,14 @@ Tasks:
     AirPlay owns 5000. Compose here is the standalone `docker-compose` binary (Makefile auto-detects).
   - Not verified visually: the Grafana panels were provisioned and queried through the datasource proxy,
     but I did not open the dashboard in a browser.
+- **Phase 5**: done. Tool calling added to the `LLMClient` port; `ToolProvider` port with local (calculator,
+  current_time), MCP (stdio + streamable-http, SSRF allowlist, namespaced `server__tool`) and a guard layer
+  (allowlist, jsonschema arg validation, timeout, output cap). Adapters for LangGraph, deepagents, ADK, MAF
+  and CrewAI each bridge to the resilient LLM port, so retry/breaker/fallback/metering apply uniformly. One
+  orchestrator-agnostic contract suite (5 scenarios x 5 providers) passes: plain-answer grammar, nested
+  balanced tool steps, failing tool then recovery, invalid-args rejection, runaway-loop -> `iteration_limit`.
+  All extras resolve in one lock (MAF uses `agent-framework-core`; the meta-package has conflicting pins).
+  CI has an `orchestrator-isolation` matrix (core + one extra each). `mcp-demo` compose profile.
+  - Framework quirks handled: MAF silently stops at max iterations (cap enforced in the runner); CrewAI
+    runs sync in a worker thread (bridged to the service loop; iteration cap enforced in the LLM bridge).
+  - Not run: the isolation matrix itself (needs CI); `mcp-demo` was validated with `compose config`, not booted.

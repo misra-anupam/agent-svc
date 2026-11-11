@@ -10,10 +10,19 @@ Role = Literal["system", "user", "assistant", "tool"]
 
 
 @dataclass(frozen=True, slots=True)
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class Message:
     role: Role
     content: str
     name: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()  # assistant -> requested tool invocations
+    tool_call_id: str | None = None  # tool -> which call this result answers
 
 
 @dataclass(frozen=True, slots=True)

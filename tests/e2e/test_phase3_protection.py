@@ -141,7 +141,8 @@ async def test_stateful_memory_and_thread_isolation(jwt_on, settings, make_clien
             json={"messages": [{"role": "user", "content": "what is my name"}]},
             headers=alice,
         )
-        seen = [m.content for m in primary.seen[-1]]
+        prompt = settings.orchestrator.system_prompt  # the agent's own prompt is not memory
+        seen = [m.content for m in primary.seen[-1] if m.content != prompt]
         assert seen == ["my name is Alice", "noted", "what is my name"]  # server stitched history
 
         hist = await c.get("/v1/threads/th", headers=alice)
@@ -150,7 +151,7 @@ async def test_stateful_memory_and_thread_isolation(jwt_on, settings, make_clien
 
         await c.put("/v1/memory/user", json={"facts": {"lang": "en"}}, headers=alice)
         await c.post("/v1/threads/th2/chat", json=BODY, headers=alice)
-        assert primary.seen[-1][0].role == "system" and "lang=en" in primary.seen[-1][0].content
+        assert any(m.role == "system" and "lang=en" in m.content for m in primary.seen[-1])
 
         assert (await c.delete("/v1/threads/th", headers=alice)).status_code == 204
         assert (await c.get("/v1/threads/th", headers=alice)).status_code == 404

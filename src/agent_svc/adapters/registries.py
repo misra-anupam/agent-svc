@@ -14,6 +14,7 @@ from agent_svc.domain.ports import (
     LongTermMemory,
     RunBuffer,
     ThreadMemory,
+    ToolProvider,
     Tracer,
     UserMemory,
 )
@@ -37,6 +38,11 @@ orchestrators.register(
 orchestrators.register("maf", "agent_svc.adapters.orchestrators.maf:build", extra="maf")
 orchestrators.register("crewai", "agent_svc.adapters.orchestrators.crewai:build", extra="crewai")
 
+
+# Tool sources: factory(settings) -> ToolProvider | None (None = not configured)
+tool_sources: Registry[ToolProvider | None] = Registry("tools")
+tool_sources.register("local", "agent_svc.adapters.tools.local:build")
+tool_sources.register("mcp", "agent_svc.adapters.tools.mcp:build", extra="mcp")
 
 tracers: Registry[Tracer] = Registry("tracing")
 tracers.register("none", "agent_svc.adapters.tracing.noop:build")
@@ -85,5 +91,10 @@ def build_llm(settings: Settings) -> LLMClient:
     return build_llm_stack(s, lambda model: llm_providers.create(s.provider, settings, model))
 
 
-def build_runner(settings: Settings, llm: LLMClient) -> AgentRunner:
-    return orchestrators.create(settings.orchestrator.provider, settings, llm)
+def build_tool_sources(settings: Settings) -> list[ToolProvider]:
+    sources = (tool_sources.create(name, settings) for name in tool_sources.names())
+    return [s for s in sources if s is not None]
+
+
+def build_runner(settings: Settings, llm: LLMClient, tools: ToolProvider) -> AgentRunner:
+    return orchestrators.create(settings.orchestrator.provider, settings, llm, tools)
