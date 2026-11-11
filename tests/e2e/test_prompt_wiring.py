@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_svc.adapters.llm.fake import FakeLLM
+from tests.scripted import ScriptedModel
+
 from agent_svc.adapters.prompts.mlflow import MlflowPromptStore
 
 
@@ -15,8 +16,8 @@ async def test_system_prompt_comes_from_the_store_and_agent_info_reports_it(  # 
     await store.register("system", "You are a very formal butler.")
     await store.set_alias("system", "prod", "2")
     settings.prompts.mlflow_tracking_uri, settings.prompts.ref = uri, "system@prod"
-    primary = FakeLLM("fake/primary", reply="ok")
-    async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}) as c:
+    primary = ScriptedModel("test/primary", reply="ok")
+    async with make_client({"test/primary": primary, "test/secondary": ScriptedModel()}) as c:
         info = (await c.get("/v1/agent")).json()
         await c.post("/v1/threads/t/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert info["prompt"] == "system:2"

@@ -2,8 +2,8 @@
 
 import asyncpg
 import pytest
+from tests.helpers import HashEmbedder
 
-from agent_svc.adapters.embedding.embedders import FakeEmbedder
 from agent_svc.adapters.infra.schema import ensure_schema
 from agent_svc.adapters.memory.long_term import PgVectorLongTermMemory
 from agent_svc.adapters.memory.user import PostgresUserMemory
@@ -46,7 +46,7 @@ async def test_user_memory_upsert_merge_delete(pool: asyncpg.Pool) -> None:
 
 
 async def test_pgvector_recall_is_ranked_and_namespaced(pool: asyncpg.Pool) -> None:
-    lt = PgVectorLongTermMemory(pool, FakeEmbedder(DIM))
+    lt = PgVectorLongTermMemory(pool, HashEmbedder(DIM))
     await lt.remember("t", "alice", "my favourite colour is green", thread="a")
     await lt.remember("t", "alice", "kubernetes deploy pipeline notes")
     await lt.remember("t", "bob", "green is bobs colour too")

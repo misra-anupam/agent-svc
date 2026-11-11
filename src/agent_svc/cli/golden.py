@@ -1,10 +1,10 @@
 """``agent-svc-eval``: replay the golden dataset through the service stack and gate on thresholds.
 
-    uv run agent-svc-eval                       # scripted model (no API key), MLflow GenAI scorer
-    uv run agent-svc-eval --evaluator mlflow_genai
-    uv run agent-svc-eval --real --exclude-tags simulate-only    # your configured model
+    uv run agent-svc-eval                          # your configured model (OPENROUTER_API_KEY)
+    uv run agent-svc-eval --tags guardrails
 
-Exit code 1 when any threshold is violated, so CI can gate on it.
+Exit code 1 when any threshold is violated, so CI can gate on it. Cases tagged ``simulate-only``
+assume scripted replies and are skipped unless you pass ``--exclude-tags`` yourself.
 """
 
 from __future__ import annotations
@@ -18,42 +18,17 @@ import time
 from pathlib import Path
 
 from agent_svc.adapters import registries as reg
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.application.golden import GoldenRunner, load_cases, load_thresholds
 from agent_svc.config.settings import Settings
 from agent_svc.container import Container
-from agent_svc.domain.models import ToolCall
-from agent_svc.domain.ports import EvalReport, GoldenCase, Threshold
+from agent_svc.domain.ports import EvalReport, Threshold
 
 
-def _simulation_rules(cases: list[GoldenCase]) -> dict[str, tuple[str, tuple[ToolCall, ...]]]:
-    rules: dict[str, tuple[str, tuple[ToolCall, ...]]] = {}
-    for case in cases:
-        sim = case.metadata.get("simulate")
-        if not sim:
-            continue
-        calls = tuple(
-            ToolCall(f"sim-{case.id}-{i}", t["name"], t.get("arguments", {}))
-            for i, t in enumerate(sim.get("tools", []))
-        )
-        rules[case.input] = (sim.get("reply", ""), calls)
-    return rules
-
-
-def _configure(
-    settings: Settings, cases: list[GoldenCase], *, simulate: bool, orchestrator: str | None
-) -> None:
+def _configure(settings: Settings, *, orchestrator: str | None) -> None:
+    """Harness overrides: no infra, no auth or limits, a fixed tool set, no answer cache."""
     settings.cache.provider = "none"  # a cached answer would hide a regression
     if orchestrator:
         settings.orchestrator.provider = orchestrator  # type: ignore[assignment]
-    if not simulate:
-        return
-    rules = _simulation_rules(cases)
-    reg.llm_providers.register(
-        "fake", lambda _s, model: FakeLLM(model, reply="(no scripted reply)", rules=rules)
-    )
-    settings.llm.provider = "fake"
-    settings.llm.primary_model, settings.llm.secondary_model = "fake/primary", "fake/secondary"
     settings.tools.local = ["calculator", "current_time"]
     settings.redis.enabled = settings.postgres.enabled = False
     settings.ratelimit.provider = "none"
@@ -65,8 +40,6 @@ def _configure(
     settings.mcp.servers = []
     settings.memory.thread_provider = settings.memory.user_provider = "none"
     settings.memory.long_term_provider = "none"
-    if settings.orchestrator.provider == "echo":
-        settings.orchestrator.provider = "langgraph"
 
 
 def render(report: EvalReport, thresholds: dict[str, Threshold]) -> str:
@@ -103,13 +76,13 @@ async def run(args: argparse.Namespace) -> int:
     cases = load_cases(
         args.dataset or settings.evaluation.golden_dir,
         tags=args.tags,
-        exclude_tags=args.exclude_tags or (() if args.simulate else ("simulate-only",)),
+        exclude_tags=args.exclude_tags or ("simulate-only",),
     )
     if not cases:
         print("no golden cases selected", file=sys.stderr)
         return 2
     thresholds = load_thresholds(args.thresholds or settings.evaluation.thresholds_file)
-    _configure(settings, cases, simulate=args.simulate, orchestrator=args.orchestrator)
+    _configure(settings, orchestrator=args.orchestrator)
     evaluator = reg.evaluators.create(args.evaluator or settings.evaluation.provider, settings)
 
     container = Container(settings)
@@ -134,17 +107,6 @@ async def run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="agent-svc-eval", description=__doc__)
-    mode = p.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--simulate",
-        dest="simulate",
-        action="store_true",
-        default=True,
-        help="scripted model from metadata.simulate (default; no API key)",
-    )
-    mode.add_argument(
-        "--real", dest="simulate", action="store_false", help="use the configured LLM"
-    )
     p.add_argument(
         "--evaluator", choices=sorted(reg.evaluators.names()), help="default: eval.provider"
     )

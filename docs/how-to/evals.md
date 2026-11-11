@@ -4,8 +4,7 @@
 [`evals/golden/README.md`](https://github.com/misra-anupam/agent-svc/blob/main/evals/golden/README.md).
 
 ```bash
-make eval                                            # scripted model, MLflow GenAI scorer (sqlite), no API key
-uv run agent-svc-eval --real --exclude-tags simulate-only   # your configured model
+make eval                                            # your model (OPENROUTER_API_KEY), MLflow GenAI scorer on sqlite
 ```
 
 Exit code is `1` when any threshold fails, so CI can gate on it. A report JSON is written to
@@ -13,9 +12,9 @@ Exit code is `1` when any threshold fails, so CI can gate on it. A report JSON i
 
 ## What the default gate proves
 
-It replays the cases through the **real stack** (guardrails, tools, orchestrator) with a scripted
-model (`metadata.simulate`). That guards tool routing, trajectories, guardrail behaviour and the answer
-contract. It does **not** measure model quality: use `--real` for that, ideally on a schedule.
+It replays the cases through the **real stack** (guardrails, tools, orchestrator) with your configured
+model. The CI step runs only when the `OPENROUTER_API_KEY` secret is set. Cases tagged `simulate-only`
+are skipped. Real models are non-deterministic, so a flaky gate usually means thresholds that are too tight.
 
 ## Metrics
 

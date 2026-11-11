@@ -8,7 +8,7 @@ nesting: `AGENT_LLM__PRIMARY_MODEL`, `AGENT_GUARDRAILS__FAIL_MODE`. Invalid valu
 
 | File | Use |
 |---|---|
-| `local-min.env` | Echo orchestrator, no auth, no external services beyond optional Redis |
+| `local-min.env` | LangGraph + OpenRouter, no auth, no external services beyond optional Redis |
 | `enterprise.env` | JWT, Redis limits/cache/memory, Postgres + pgvector, detached runs |
 | `oss-observability.env` | LangGraph with MLflow traces |
 

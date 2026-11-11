@@ -7,8 +7,8 @@ import os
 
 import pytest
 from tests.helpers import make_request
+from tests.scripted import ScriptedModel
 
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.adapters.registries import orchestrators
 from agent_svc.adapters.tools.composite import GuardedToolProvider
 from agent_svc.adapters.tools.local import BUILTIN, LocalToolProvider
@@ -32,7 +32,7 @@ PROVIDERS = os.environ.get("CONTRACT_PROVIDERS", "langgraph").split(",")
 CALC = ToolCall("c1", "calculator", {"expression": "2+3"})
 
 
-def make_runner(name: str, llm: FakeLLM, *, max_iterations: int = 8):  # type: ignore[no-untyped-def]
+def make_runner(name: str, llm: ScriptedModel, *, max_iterations: int = 8):  # type: ignore[no-untyped-def]
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     settings.orchestrator.max_iterations = max_iterations
     tools = GuardedToolProvider(
@@ -68,7 +68,7 @@ def provider(request: pytest.FixtureRequest) -> str:
 
 
 async def test_plain_answer_event_grammar(provider: str) -> None:
-    events = await collect(make_runner(provider, FakeLLM(reply="alpha beta gamma")), "hello")
+    events = await collect(make_runner(provider, ScriptedModel(reply="alpha beta gamma")), "hello")
     assert isinstance(events[0], RunStarted) and isinstance(events[-1], RunCompleted)
     assert all(e.run_id == "r9" for e in events)
     deltas = "".join(e.text for e in events if isinstance(e, MessageDelta))
@@ -79,7 +79,7 @@ async def test_plain_answer_event_grammar(provider: str) -> None:
 
 
 async def test_tool_call_produces_balanced_nested_steps(provider: str) -> None:
-    llm = FakeLLM(reply="The answer is 5", tool_plan=[CALC])
+    llm = ScriptedModel(reply="The answer is 5", tool_plan=[CALC])
     events = await collect(make_runner(provider, llm))
     assert tool_shape(events) == ["start:tool:calculator", "finish:ok"]
     started = {e.step_id for e in events if isinstance(e, StepStarted)}
@@ -100,7 +100,7 @@ async def test_tool_call_produces_balanced_nested_steps(provider: str) -> None:
 
 async def test_failing_tool_is_reported_and_agent_recovers(provider: str) -> None:
     bad = ToolCall("c1", "calculator", {"expression": "1/0"})
-    llm = FakeLLM(reply="could not compute", tool_plan=[bad])
+    llm = ScriptedModel(reply="could not compute", tool_plan=[bad])
     events = await collect(make_runner(provider, llm), "divide")
     assert tool_shape(events) == ["start:tool:calculator", "finish:error"]
     assert (
@@ -112,7 +112,7 @@ async def test_failing_tool_is_reported_and_agent_recovers(provider: str) -> Non
 
 async def test_invalid_tool_arguments_are_rejected_before_execution(provider: str) -> None:
     bad = ToolCall("c1", "calculator", {"wrong": 1})  # schema requires "expression"
-    llm = FakeLLM(reply="ok", tool_plan=[bad])
+    llm = ScriptedModel(reply="ok", tool_plan=[bad])
     events = await collect(make_runner(provider, llm), "x")
     assert tool_shape(events) == ["start:tool:calculator", "finish:error"]
     # wording differs per framework (some validate before our guard); the model must be told
@@ -120,7 +120,7 @@ async def test_invalid_tool_arguments_are_rejected_before_execution(provider: st
 
 
 async def test_runaway_tool_loop_is_stopped(provider: str) -> None:
-    llm = FakeLLM(reply="never reached", tool_plan=[CALC] * 40)
+    llm = ScriptedModel(reply="never reached", tool_plan=[CALC] * 40)
     with pytest.raises(IterationLimitError):
         await collect(make_runner(provider, llm, max_iterations=2), "loop forever")
     assert llm.calls < 40

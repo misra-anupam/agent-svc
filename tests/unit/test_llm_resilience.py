@@ -1,7 +1,7 @@
 import pytest
+from tests.scripted import ScriptedModel
 
 from agent_svc.adapters.llm.decorators import BreakerLLM, FallbackLLM, RetryingLLM
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.adapters.resilience.circuit_breaker import CircuitBreaker
 from agent_svc.adapters.resilience.retry import make_retrying
 from agent_svc.domain.exceptions import BadRequestError, CircuitOpenError, UpstreamError
@@ -15,49 +15,54 @@ def retrying(n: int = 3):  # type: ignore[no-untyped-def]
 
 
 async def test_retry_recovers_after_transient_failures() -> None:
-    fake = FakeLLM(fail_times=2)
+    fake = ScriptedModel(fail_times=2)
     resp = await RetryingLLM(fake, retrying()).complete(MSGS)
     assert resp.text and fake.calls == 3
 
 
 async def test_retry_gives_up_after_max_attempts() -> None:
-    fake = FakeLLM(fail_times=-1)
+    fake = ScriptedModel(fail_times=-1)
     with pytest.raises(UpstreamError):
         await RetryingLLM(fake, retrying(3)).complete(MSGS)
     assert fake.calls == 3
 
 
 async def test_non_retryable_error_is_not_retried() -> None:
-    fake = FakeLLM(fail_times=-1, error=BadRequestError("nope"))
+    fake = ScriptedModel(fail_times=-1, error=BadRequestError("nope"))
     with pytest.raises(BadRequestError):
         await RetryingLLM(fake, retrying()).complete(MSGS)
     assert fake.calls == 1
 
 
 async def test_stream_retry_before_first_chunk() -> None:
-    fake = FakeLLM(reply="a b c", fail_times=1)
+    fake = ScriptedModel(reply="a b c", fail_times=1)
     chunks = [c async for c in RetryingLLM(fake, retrying()).stream(MSGS)]
     assert "".join(c.delta for c in chunks) == "a b c" and fake.calls == 2
 
 
 async def test_fallback_to_secondary_on_primary_failure() -> None:
-    primary, secondary = FakeLLM("p", fail_times=-1), FakeLLM("s", reply="from secondary")
+    primary, secondary = (
+        ScriptedModel("p", fail_times=-1),
+        ScriptedModel("s", reply="from secondary"),
+    )
     llm = FallbackLLM(primary, secondary)
     resp = await llm.complete(MSGS)
     assert resp.model == "s" and resp.text == "from secondary"
 
 
 async def test_no_fallback_for_caller_errors() -> None:
-    llm = FallbackLLM(FakeLLM("p", fail_times=-1, error=BadRequestError("x")), FakeLLM("s"))
+    llm = FallbackLLM(
+        ScriptedModel("p", fail_times=-1, error=BadRequestError("x")), ScriptedModel("s")
+    )
     with pytest.raises(BadRequestError):
         await llm.complete(MSGS)
 
 
 async def test_stream_fallback_only_before_first_chunk() -> None:
-    llm = FallbackLLM(FakeLLM("p", fail_times=-1), FakeLLM("s", reply="ok now"))
+    llm = FallbackLLM(ScriptedModel("p", fail_times=-1), ScriptedModel("s", reply="ok now"))
     assert "".join([c.delta async for c in llm.stream(MSGS)]).strip() == "ok now"
 
-    mid = FallbackLLM(FakeLLM("p", reply="a b c d", fail_after_chunks=2), FakeLLM("s"))
+    mid = FallbackLLM(ScriptedModel("p", reply="a b c d", fail_after_chunks=2), ScriptedModel("s"))
     got: list[str] = []
     with pytest.raises(UpstreamError):
         async for c in mid.stream(MSGS):
@@ -66,10 +71,10 @@ async def test_stream_fallback_only_before_first_chunk() -> None:
 
 
 async def test_breaker_opens_then_fallback_serves_fast() -> None:
-    primary = FakeLLM("p", fail_times=-1)
+    primary = ScriptedModel("p", fail_times=-1)
     breaker = CircuitBreaker("llm-p", failure_threshold=2, reset_seconds=60)
     hardened = RetryingLLM(BreakerLLM(primary, breaker), retrying(5))
-    llm = FallbackLLM(hardened, FakeLLM("s"))
+    llm = FallbackLLM(hardened, ScriptedModel("s"))
     r1 = await llm.complete(MSGS)  # 2 failures trip the breaker; retry stops on CircuitOpen
     assert r1.model == "s" and primary.calls == 2
     r2 = await llm.complete(MSGS)  # breaker open: primary not even called

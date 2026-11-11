@@ -9,7 +9,10 @@ jobs:
       - run: uv sync --group dev --extra litellm --extra langgraph --extra mlflow --extra mcp --extra presidio --extra guardrails_ai --extra mlflow_genai
       - run: uv run python -m spacy download en_core_web_sm
       - run: make check
-      - run: make eval  # golden-dataset gate
+      - run: make eval  # golden-dataset gate, real model
+        if: env.OPENROUTER_API_KEY != ''
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
   # Each orchestrator extra must work with only core + its own deps (no hidden cross-imports).
   orchestrator-isolation:

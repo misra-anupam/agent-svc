@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import math
+from collections.abc import Sequence
 from typing import Any
 
 from agent_svc.domain.models import AgentRequest, Message, Principal
@@ -56,3 +59,21 @@ class RecordingTracer:
 
     async def flush(self) -> None: ...
     async def shutdown(self) -> None: ...
+
+
+class HashEmbedder:
+    """Deterministic hashed bag-of-words embedder: similar texts are close (tests only)."""
+
+    def __init__(self, dim: int = 256) -> None:
+        self.dim = dim
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        return [self._one(t) for t in texts]
+
+    def _one(self, text: str) -> list[float]:
+        v = [0.0] * self.dim
+        for tok in text.lower().split():
+            h = int.from_bytes(hashlib.blake2b(tok.encode(), digest_size=8).digest(), "big")
+            v[h % self.dim] += 1.0
+        norm = math.sqrt(sum(x * x for x in v)) or 1.0
+        return [x / norm for x in v]

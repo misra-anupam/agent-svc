@@ -5,7 +5,7 @@ every concern behind a port you can swap by configuration.
 
 | Concern | Choices |
 |---|---|
-| Orchestrator | LangGraph (`echo` for demos) |
+| Orchestrator | LangGraph |
 | LLM | LiteLLM with retry, circuit breaker and primary/secondary fallback |
 | Tools | local tools, MCP servers (stdio / streamable-http) |
 | State | thread (Redis), user (Postgres), long-term (pgvector) memory |
@@ -16,7 +16,8 @@ every concern behind a port you can swap by configuration.
 
 ```bash
 make install && make check
-AGENT_ORCHESTRATOR__PROVIDER=echo make run     # http://localhost:8000/ui
+export OPENROUTER_API_KEY=sk-or-...
+make run                                       # http://localhost:8000/ui
 curl -N -X POST localhost:8000/v1/threads/demo/chat \
   -H 'content-type: application/json' \
   -d '{"messages":[{"role":"user","content":"hello"}]}'
@@ -24,5 +25,4 @@ curl -N -X POST localhost:8000/v1/threads/demo/chat \
 
 !!! note "Not implemented"
     The plan's named, versioned **agent registry** (`agents/<name>@N`, `/v2` stub) was deliberately
-    left out. Today there is one agent identified by `app.agent_name` / `app.agent_version`
-    (see [Project plan & status](PLAN.md)).
+    left out. Today there is one agent identified by `app.agent_name` / `app.agent_version`.

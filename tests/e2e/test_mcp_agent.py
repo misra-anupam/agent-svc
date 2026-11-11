@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 from tests.helpers import parse_sse
+from tests.scripted import ScriptedModel
 
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.config.settings import McpServerConfig
 from agent_svc.domain.models import ToolCall
 
@@ -23,12 +23,12 @@ async def test_agent_calls_mcp_tool_and_ui_sees_an_mcp_step(
         McpServerConfig(name="demo", transport="stdio", command=[sys.executable, SERVER, "stdio"])
     ]
     settings.mcp.connect_timeout_seconds = 30
-    primary = FakeLLM(
-        "fake/primary",
+    primary = ScriptedModel(
+        "test/primary",
         reply="The sum is 5",
         tool_plan=[ToolCall("c1", "demo__add", {"a": 2, "b": 3})],
     )
-    async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}) as c:
+    async with make_client({"test/primary": primary, "test/secondary": ScriptedModel()}) as c:
         r = await c.post("/v1/threads/t/chat", json=BODY)
     events = parse_sse(r.text)
     started = next(d for t, d in events if t == "step.started" and d["name"] == "demo__add")

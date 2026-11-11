@@ -9,13 +9,13 @@ import pytest
 
 import agent_svc.adapters.registries as registries
 from agent_svc.adapters.infra.redis import RedisResource
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.adapters.llm.stack import build_llm_stack
 from agent_svc.config import Settings
 from agent_svc.container import Container
 from agent_svc.domain.models import ToolCall
 from agent_svc.main import create_app
 from tests.helpers import RecordingTracer
+from tests.scripted import ScriptedModel
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +36,7 @@ def settings() -> Settings:
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     s.app.environment = "test"
     s.app.log_json = False
-    s.redis.enabled = False  # tests inject a fake resource instead
+    s.redis.enabled = False  # tests inject a fakeredis resource instead
     return s
 
 
@@ -65,23 +65,23 @@ def make_client(
     LLMs are injected through the real resilience stack so breaker/retry/fallback stay in play.
     """
     settings.orchestrator.provider = "langgraph"
-    settings.llm.provider = "fake"
-    settings.llm.primary_model = "fake/primary"
-    settings.llm.secondary_model = "fake/secondary"
+    settings.llm.provider = "litellm"
+    settings.llm.primary_model = "test/primary"
+    settings.llm.secondary_model = "test/secondary"
     settings.llm.max_retries = 2
     settings.tools.local = ["calculator"]
 
     @asynccontextmanager
     async def _make(
-        fakes: dict[str, FakeLLM] | None = None, *, redis: bool = False
+        fakes: dict[str, ScriptedModel] | None = None, *, redis: bool = False
     ) -> AsyncIterator[httpx.AsyncClient]:
         llms = fakes or {
-            "fake/primary": FakeLLM(
-                "fake/primary",
+            "test/primary": ScriptedModel(
+                "test/primary",
                 reply="the quick brown fox",
                 tool_plan=[ToolCall("c1", "calculator", {"expression": "2+3"})],
             ),
-            "fake/secondary": FakeLLM("fake/secondary"),
+            "test/secondary": ScriptedModel("test/secondary"),
         }
         monkeypatch.setattr(
             registries, "build_llm", lambda s: build_llm_stack(s.llm, lambda m: llms[m])

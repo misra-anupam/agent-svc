@@ -18,7 +18,7 @@ text{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15p
 <rect class="dec" x="40" y="256" width="360" height="44" rx="9"/><text class="t" x="220.0" y="282.0" text-anchor="middle">TracedRunner</text>
 <rect class="dec" x="40" y="320" width="360" height="44" rx="9"/><text class="t" x="220.0" y="346.0" text-anchor="middle">CachedRunner</text>
 <rect class="dec" x="40" y="384" width="360" height="56" rx="9"/><text class="t" x="220.0" y="407.0" text-anchor="middle">GuardedRunner</text><text class="s" x="220.0" y="425.0" text-anchor="middle">input check  &gt;  run  &gt;  output check</text>
-<rect class="orc" x="40" y="478" width="360" height="60" rx="9"/><text class="t" x="220.0" y="503.0" text-anchor="middle">Orchestrator</text><text class="s" x="220.0" y="521.0" text-anchor="middle">LangGraph | echo</text>
+<rect class="orc" x="40" y="478" width="360" height="60" rx="9"/><text class="t" x="220.0" y="503.0" text-anchor="middle">Orchestrator</text><text class="s" x="220.0" y="521.0" text-anchor="middle">LangGraph</text>
 <rect class="out" x="40" y="592" width="360" height="60" rx="9"/><text class="t" x="220.0" y="617.0" text-anchor="middle">SSE event stream</text><text class="s" x="220.0" y="635.0" text-anchor="middle">run.started ... run.completed | run.error</text>
 <path class="ln" d="M220 64V84"/>
 <path class="ln" d="M220 128V148"/>

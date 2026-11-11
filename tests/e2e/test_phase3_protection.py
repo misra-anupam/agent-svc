@@ -5,8 +5,8 @@ import jwt
 import pytest
 from pydantic import SecretStr
 from tests.helpers import parse_sse
+from tests.scripted import ScriptedModel
 
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.config.settings import TierLimit
 
 SECRET = "s3cret-s3cret-s3cret-s3cret-123456"
@@ -79,7 +79,7 @@ async def test_tier_from_jwt_changes_limit(jwt_on, settings, make_client) -> Non
 
 async def test_token_budget_is_enforced_from_real_usage(settings, make_client) -> None:  # type: ignore[no-untyped-def]
     settings.ratelimit.provider = "redis"
-    settings.ratelimit.ip_daily_token_budget = 3  # FakeLLM reports ~5 tokens for one run
+    settings.ratelimit.ip_daily_token_budget = 3  # ScriptedModel reports ~5 tokens for one run
     async with make_client(redis=True) as c:
         assert (await c.post("/v1/threads/t/chat", json=BODY)).status_code == 200
         r = await c.post("/v1/threads/t/chat", json=BODY)
@@ -92,8 +92,8 @@ async def test_concurrency_cap_rejects_second_parallel_run(settings, make_client
         requests_per_minute=6000, burst=50, daily_token_budget=10**9, max_concurrent=1
     )
     slow = {
-        "fake/primary": FakeLLM("fake/primary", reply="a b c d e", delay=0.1),
-        "fake/secondary": FakeLLM("fake/secondary"),
+        "test/primary": ScriptedModel("test/primary", reply="a b c d e", delay=0.1),
+        "test/secondary": ScriptedModel("test/secondary"),
     }
     async with make_client(slow, redis=True) as c:
         r1, r2 = await asyncio.gather(c.post("/v1/threads/t/chat", json=BODY), _later(c))
@@ -108,8 +108,10 @@ async def _later(c):  # type: ignore[no-untyped-def]
 
 async def test_answer_cache_serves_second_request(settings, make_client) -> None:  # type: ignore[no-untyped-def]
     settings.cache.provider = "redis"
-    primary = FakeLLM("fake/primary", reply="cached answer here")
-    async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}, redis=True) as c:
+    primary = ScriptedModel("test/primary", reply="cached answer here")
+    async with make_client(
+        {"test/primary": primary, "test/secondary": ScriptedModel()}, redis=True
+    ) as c:
         a = parse_sse((await c.post("/v1/threads/t1/chat", json=BODY)).text)
         b = parse_sse((await c.post("/v1/threads/t2/chat", json=BODY)).text)
         d = parse_sse(
@@ -128,8 +130,10 @@ async def test_answer_cache_serves_second_request(settings, make_client) -> None
 async def test_stateful_memory_and_thread_isolation(jwt_on, settings, make_client) -> None:  # type: ignore[no-untyped-def]
     settings.memory.thread_provider = "redis"
     settings.memory.user_provider = "inmemory"
-    primary = FakeLLM("fake/primary", reply="noted")
-    async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}, redis=True) as c:
+    primary = ScriptedModel("test/primary", reply="noted")
+    async with make_client(
+        {"test/primary": primary, "test/secondary": ScriptedModel()}, redis=True
+    ) as c:
         alice = bearer("alice")
         await c.post(
             "/v1/threads/th/chat",
@@ -160,9 +164,11 @@ async def test_stateful_memory_and_thread_isolation(jwt_on, settings, make_clien
 
 
 async def test_idempotency_key_replays_instead_of_rerunning(make_client) -> None:  # type: ignore[no-untyped-def]
-    primary = FakeLLM("fake/primary", reply="only once")
+    primary = ScriptedModel("test/primary", reply="only once")
     h = {"Idempotency-Key": "key-12345678"}
-    async with make_client({"fake/primary": primary, "fake/secondary": FakeLLM()}, redis=True) as c:
+    async with make_client(
+        {"test/primary": primary, "test/secondary": ScriptedModel()}, redis=True
+    ) as c:
         r1 = await c.post("/v1/threads/t/chat", json=BODY, headers=h)
         r2 = await c.post("/v1/threads/t/chat", json=BODY, headers=h)
         r3 = await c.post(

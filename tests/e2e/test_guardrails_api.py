@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from tests.helpers import parse_sse
+from tests.scripted import ScriptedModel
 
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.config.settings import TierPolicy
 
 
@@ -10,8 +10,11 @@ def body(text: str) -> dict[str, object]:
     return {"messages": [{"role": "user", "content": text}]}
 
 
-def llms(reply: str) -> dict[str, FakeLLM]:
-    return {"fake/primary": FakeLLM("fake/primary", reply=reply), "fake/secondary": FakeLLM()}
+def llms(reply: str) -> dict[str, ScriptedModel]:
+    return {
+        "test/primary": ScriptedModel("test/primary", reply=reply),
+        "test/secondary": ScriptedModel(),
+    }
 
 
 async def test_prompt_injection_ends_in_a_policy_run_error(make_client) -> None:  # type: ignore[no-untyped-def]

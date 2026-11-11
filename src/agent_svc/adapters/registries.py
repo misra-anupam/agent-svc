@@ -30,11 +30,9 @@ from agent_svc.registry import Registry
 # Base (unwrapped) LLM providers: factory(settings, model_name) -> LLMClient
 llm_providers: Registry[LLMClient] = Registry("llm")
 llm_providers.register("litellm", "agent_svc.adapters.llm.litellm_client:build", extra="litellm")
-llm_providers.register("fake", "agent_svc.adapters.llm.fake:build_fake")
 
 # Orchestrators: factory(settings, llm) -> AgentRunner
 orchestrators: Registry[AgentRunner] = Registry("orchestrators")
-orchestrators.register("echo", "agent_svc.adapters.orchestrators.echo:build_echo")
 orchestrators.register(
     "langgraph", "agent_svc.adapters.orchestrators.langgraph:build", extra="langgraph"
 )
@@ -88,7 +86,6 @@ authenticators.register("noauth", "agent_svc.adapters.auth.noauth:build")
 authenticators.register("jwt", "agent_svc.adapters.auth.jwt:build")
 
 embedders: Registry[Embedder] = Registry("embedding")
-embedders.register("fake", "agent_svc.adapters.embedding.embedders:build_fake")
 embedders.register(
     "litellm", "agent_svc.adapters.embedding.embedders:build_litellm", extra="litellm"
 )

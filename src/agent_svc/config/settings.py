@@ -48,8 +48,9 @@ class PostgresSettings(BaseModel):
 
 
 class LLMSettings(BaseModel):
-    provider: Literal["litellm", "fake"] = "litellm"
-    primary_model: str = "anthropic/claude-sonnet-4-5"
+    provider: Literal["litellm"] = "litellm"
+    # OpenRouter via LiteLLM; the key is read from OPENROUTER_API_KEY
+    primary_model: str = "openrouter/anthropic/claude-sonnet-4.5"
     secondary_model: str | None = None
     timeout_seconds: float = 60.0
     max_retries: int = 3
@@ -58,7 +59,7 @@ class LLMSettings(BaseModel):
 
 
 class OrchestratorSettings(BaseModel):
-    provider: Literal["langgraph", "echo"] = "echo"
+    provider: Literal["langgraph"] = "langgraph"
     system_prompt: str = "You are a helpful assistant. Use tools when they help."
     max_iterations: int = 8  # cap on model/tool loops per run (OWASP LLM10)
 
@@ -169,7 +170,7 @@ class MemorySettings(BaseModel):
     max_context_tokens: int = 8_000
     long_term_top_k: int = 4
     long_term_write: bool = True
-    embedding_provider: Literal["fake", "litellm"] = "fake"
+    embedding_provider: Literal["litellm"] = "litellm"
     embedding_model: str = "openai/text-embedding-3-small"
     embedding_dim: int = 1536
 

@@ -1,7 +1,7 @@
 import fakeredis
 import pytest
+from tests.helpers import HashEmbedder
 
-from agent_svc.adapters.embedding.embedders import FakeEmbedder
 from agent_svc.adapters.memory.long_term import InMemoryLongTermMemory
 from agent_svc.adapters.memory.thread import InMemoryThreadMemory, RedisThreadMemory
 from agent_svc.adapters.memory.user import InMemoryUserMemory
@@ -39,7 +39,7 @@ async def test_user_memory_merge_and_delete() -> None:
 
 
 async def test_long_term_recall_ranks_by_similarity_and_is_namespaced() -> None:
-    lt = InMemoryLongTermMemory(FakeEmbedder(128))
+    lt = InMemoryLongTermMemory(HashEmbedder(128))
     await lt.remember("t", "alice", "my favourite colour is green")
     await lt.remember("t", "alice", "the deploy runs on kubernetes")
     await lt.remember("t", "bob", "bob likes green tea a lot")
@@ -58,7 +58,7 @@ P = Principal(subject="alice", tenant="t")
 
 
 async def test_context_stitches_history_user_facts_and_long_term() -> None:
-    user, lt = InMemoryUserMemory(), InMemoryLongTermMemory(FakeEmbedder(128))
+    user, lt = InMemoryUserMemory(), InMemoryLongTermMemory(HashEmbedder(128))
     await user.merge("t", "alice", {"name": "Alice"})
     await lt.remember("t", "alice", "I like green tea")
     f = _facade(thread=InMemoryThreadMemory(), user=user, long_term=lt)

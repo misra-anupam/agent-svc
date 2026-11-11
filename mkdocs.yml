@@ -25,4 +25,3 @@ nav:
       - "0001 Hexagonal architecture": adrs/0001-hexagonal.md
       - "0002 Bridge frameworks to the LLM port": adrs/0002-llm-port-bridges.md
       - "0003 Guardrails fail closed": adrs/0003-guardrails-fail-closed.md
-  - Project plan & status: PLAN.md

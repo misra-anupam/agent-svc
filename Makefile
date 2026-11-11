@@ -14,7 +14,7 @@ test:
 test-integration:
 	uv run pytest -q -m integration
 check: lint types arch test
-# Golden-dataset gate: scripted model through the real stack, no API key. Fails on any threshold.
+# Golden-dataset gate: your configured model (OPENROUTER_API_KEY) through the real stack. Fails on any threshold.
 eval:
 	MLFLOW_DISABLE_AGENT_HINT=1 uv run agent-svc-eval $(EVAL_ARGS)
 run:

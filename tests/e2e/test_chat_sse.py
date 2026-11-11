@@ -4,8 +4,8 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 from tests.helpers import parse_sse
+from tests.scripted import ScriptedModel
 
-from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.api.sse import RunSupervisor
 from agent_svc.domain.exceptions import UpstreamError
 from agent_svc.domain.models import MessageDelta, RunCompleted
@@ -29,20 +29,20 @@ async def test_sse_happy_path(make_client) -> None:  # type: ignore[no-untyped-d
 
 async def test_fallback_is_visible_in_usage_model(make_client) -> None:  # type: ignore[no-untyped-def]
     fakes = {
-        "fake/primary": FakeLLM("fake/primary", fail_times=-1),
-        "fake/secondary": FakeLLM("fake/secondary", reply="served by secondary"),
+        "test/primary": ScriptedModel("test/primary", fail_times=-1),
+        "test/secondary": ScriptedModel("test/secondary", reply="served by secondary"),
     }
     async with make_client(fakes) as c:
         events = parse_sse((await c.post("/v1/threads/th-1/chat", json=BODY)).text)
-    assert next(d for t, d in events if t == "usage")["model"] == "fake/secondary"
+    assert next(d for t, d in events if t == "usage")["model"] == "test/secondary"
     assert events[-1][0] == "run.completed"
 
 
 async def test_total_llm_outage_becomes_run_error_event(make_client) -> None:  # type: ignore[no-untyped-def]
     err = UpstreamError("down")
     fakes = {
-        "fake/primary": FakeLLM("fake/primary", fail_times=-1, error=err),
-        "fake/secondary": FakeLLM("fake/secondary", fail_times=-1, error=err),
+        "test/primary": ScriptedModel("test/primary", fail_times=-1, error=err),
+        "test/secondary": ScriptedModel("test/secondary", fail_times=-1, error=err),
     }
     async with make_client(fakes) as c:
         r = await c.post("/v1/threads/th-1/chat", json=BODY)

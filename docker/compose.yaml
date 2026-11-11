@@ -14,8 +14,9 @@ services:
       AGENT_POSTGRES__DSN: postgresql://agent:agent@postgres:5432/agent
       AGENT_TRACING__MLFLOW_TRACKING_URI: http://mlflow:5000
       AGENT_PROMPTS__MLFLOW_TRACKING_URI: http://mlflow:5000
-      AGENT_ORCHESTRATOR__PROVIDER: ${AGENT_ORCHESTRATOR__PROVIDER:-echo}
+      AGENT_ORCHESTRATOR__PROVIDER: ${AGENT_ORCHESTRATOR__PROVIDER:-langgraph}
       AGENT_LLM__PROVIDER: ${AGENT_LLM__PROVIDER:-litellm}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # MCP: see the mcp-demo profile for a ready-made server (needs `--extra mcp` in AGENT_EXTRAS)
       AGENT_MCP__SERVERS: ${AGENT_MCP__SERVERS:-[]}
       AGENT_MCP__ALLOWED_HOSTS: ${AGENT_MCP__ALLOWED_HOSTS:-[]}

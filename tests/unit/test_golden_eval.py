@@ -6,8 +6,10 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from tests.scripted import ScriptedModel, simulation_rules
 
 from agent_svc.adapters import registries as reg
+from agent_svc.adapters.llm.stack import build_llm_stack
 from agent_svc.application.golden import GoldenRunner, load_cases, load_thresholds
 from agent_svc.config.settings import Settings
 from agent_svc.domain.exceptions import BadRequestError, PolicyViolationError
@@ -228,15 +230,24 @@ def _sqlite_mlflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENT_EVALUATION__MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path}/ml.db")
 
 
+def scripted(monkeypatch: pytest.MonkeyPatch, dataset: str) -> None:
+    """Serve the dataset's ``metadata.simulate`` replies through the real LLM stack."""
+    rules = simulation_rules(load_cases(dataset, tags=[], exclude_tags=[]))
+    monkeypatch.setattr(
+        reg,
+        "build_llm",
+        lambda s: build_llm_stack(s.llm, lambda m: ScriptedModel(m, rules=rules)),
+    )
+
+
 def cli_args(tmp: Path, thresholds: Path | None = None, **kw: object) -> argparse.Namespace:
     base = dict(
-        simulate=True,
         evaluator="mlflow_genai",
         orchestrator=None,
         dataset=None,
         thresholds=str(thresholds) if thresholds else None,
         tags=[],
-        exclude_tags=[],
+        exclude_tags=["none"],  # include simulate-only cases: the scripted model serves them
         concurrency=4,
         report_dir=str(tmp / "reports"),
     )
@@ -248,7 +259,7 @@ async def test_shipped_dataset_passes_the_shipped_thresholds(
 ) -> None:
     from agent_svc.cli.golden import run
 
-    monkeypatch.setattr(reg.llm_providers, "_factories", dict(reg.llm_providers._factories))
+    scripted(monkeypatch, "evals/golden")
     assert await run(cli_args(tmp_path)) == 0
     (report,) = (tmp_path / "reports").glob("*.json")
     assert json.loads(report.read_text())["passed"] is True
@@ -259,7 +270,7 @@ async def test_gate_exits_nonzero_when_a_threshold_is_violated(
 ) -> None:
     from agent_svc.cli.golden import run
 
-    monkeypatch.setattr(reg.llm_providers, "_factories", dict(reg.llm_providers._factories))
+    scripted(monkeypatch, "evals/golden")
     strict = tmp_path / "strict.yaml"
     strict.write_text("latency_p95_ms: {max: 0.0001}\n")  # impossible: must fail
     assert await run(cli_args(tmp_path, strict)) == 1
@@ -271,7 +282,6 @@ async def test_a_regression_in_agent_behaviour_fails_the_gate(
     """If the model stops calling the calculator (a routing regression), the gate catches it."""
     from agent_svc.cli.golden import run
 
-    monkeypatch.setattr(reg.llm_providers, "_factories", dict(reg.llm_providers._factories))
     data = tmp_path / "ds"
     data.mkdir()
     write(
@@ -287,4 +297,5 @@ async def test_a_regression_in_agent_behaviour_fails_the_gate(
     )  # scripted model never calls the tool
     thresholds = tmp_path / "t.yaml"
     thresholds.write_text("tool_trajectory: {min: 1.0}\n")
+    scripted(monkeypatch, str(data))
     assert await run(cli_args(tmp_path, thresholds, dataset=str(data))) == 1
