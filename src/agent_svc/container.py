@@ -73,6 +73,7 @@ class Container:
         self._started: list[Resource] = []
         self._redis: RedisResource | None = None
         self._pg: PostgresResource | None = None
+        self._meter_provider: Any = None
 
     def _register(self, res: Resource) -> None:
         self.resources.append(res)
@@ -86,7 +87,17 @@ class Container:
             self._register(self._redis)
         if s.postgres.enabled:
             self._pg = PostgresResource(s.postgres)
+            m = s.memory
+            if m.user_provider == "postgres" or m.long_term_provider == "pgvector":
+                self._pg.required = True  # selected memory cannot silently degrade
             self._register(self._pg)
+        if s.metrics.enabled:
+            from opentelemetry import metrics as otel_metrics
+
+            from agent_svc.adapters.tracing.otel_metrics import build_meter_provider
+
+            self._meter_provider = build_meter_provider(s)
+            otel_metrics.set_meter_provider(self._meter_provider)
         self._tool_sources = reg.build_tool_sources(s)  # constructed now, connected below
         for src in self._tool_sources:
             if isinstance(src, Resource):
@@ -178,9 +189,14 @@ class Container:
         if pool is not None and (
             m.user_provider == "postgres" or m.long_term_provider == "pgvector"
         ):
-            await ensure_schema(
-                pool, embedding_dim=m.embedding_dim, vector=m.long_term_provider == "pgvector"
-            )
+            try:
+                await ensure_schema(
+                    pool, embedding_dim=m.embedding_dim, vector=m.long_term_provider == "pgvector"
+                )
+            except Exception as exc:
+                raise UnavailableError(
+                    f"memory needs Postgres but it is unreachable or misconfigured: {exc}"
+                ) from exc
         embedder = (
             reg.embedders.create(m.embedding_provider, s)
             if m.long_term_provider != "none"
@@ -213,6 +229,10 @@ class Container:
             with suppress(Exception):
                 await asyncio.wait_for(self.tracer.shutdown(), timeout=10)  # flush spans
             self.tracer = None
+        if self._meter_provider is not None:
+            with suppress(Exception):
+                await asyncio.to_thread(self._meter_provider.shutdown)  # flush last export
+            self._meter_provider = None
         for res in reversed(self._started):  # reverse-order teardown
             with suppress(Exception):
                 await asyncio.wait_for(res.stop(), timeout=self.settings.app.shutdown_grace_seconds)

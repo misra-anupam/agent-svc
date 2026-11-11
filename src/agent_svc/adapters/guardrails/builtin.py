@@ -1,7 +1,6 @@
 """Dependency-free rails: injection heuristics, secrets, output handling, prompt-leak, length.
 
-Heuristics are a cheap first line of defence, not a complete one: pair them with a classifier
-(``prompt_guard`` / ``llama_guard`` / ``nemo``) for real coverage. Text is normalised (NFKC,
+Heuristics are a cheap first line of defence, not a complete one: add a classifier rail (see add-adapter) for real coverage. Text is normalised (NFKC,
 zero-width characters stripped, case-folded) before matching so trivial obfuscation does not
 bypass the patterns.
 """

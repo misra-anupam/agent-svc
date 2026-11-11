@@ -51,14 +51,35 @@ class RecordingTracer:
             self.ended = True
 
     def start_span(
-        self, name: str, *, parent: Any = None, attributes: Any = None
+        self,
+        name: str,
+        *,
+        parent: Any = None,
+        attributes: Any = None,
+        remote_parent: str | None = None,
     ) -> RecordingTracer.S:
         s = RecordingTracer.S(name, parent, attributes or {})
+        s.remote_parent = remote_parent
         self.spans.append(s)
         return s
 
     async def flush(self) -> None: ...
     async def shutdown(self) -> None: ...
+
+
+def metric_total(reader: Any, name: str, **attrs: str) -> float:
+    """Sum of a counter's data points whose attributes include ``attrs`` (cumulative)."""
+    data = reader.get_metrics_data()
+    total = 0.0
+    for rm in data.resource_metrics if data else []:
+        for sm in rm.scope_metrics:
+            for m in sm.metrics:
+                if m.name != name:
+                    continue
+                for p in m.data.data_points:
+                    if all(p.attributes.get(k) == v for k, v in attrs.items()):
+                        total += getattr(p, "value", getattr(p, "sum", 0.0))
+    return total
 
 
 class HashEmbedder:

@@ -41,15 +41,7 @@ orchestrators.register(
 # Guardrails: factory(settings) -> Guardrail
 guardrails: Registry[Guardrail] = Registry("guardrails")
 guardrails.register("builtin", "agent_svc.adapters.guardrails.builtin:build")
-guardrails.register("presidio", "agent_svc.adapters.guardrails.presidio:build", extra="presidio")
-guardrails.register(
-    "guardrails_ai", "agent_svc.adapters.guardrails.guardrails_ai:build", extra="guardrails_ai"
-)
 # no uv extra: llm-guard's pins conflict with the shared lock (archived upstream); see adapter docs
-guardrails.register("llm_guard", "agent_svc.adapters.guardrails.llm_guard:build")
-guardrails.register("nemo", "agent_svc.adapters.guardrails.http_rails:build_nemo")
-guardrails.register("llama_guard", "agent_svc.adapters.guardrails.http_rails:build_llama_guard")
-guardrails.register("prompt_guard", "agent_svc.adapters.guardrails.http_rails:build_prompt_guard")
 
 
 # Prompt stores: factory(settings) -> PromptStore
@@ -78,6 +70,7 @@ tool_sources.register("local", "agent_svc.adapters.tools.local:build")
 tool_sources.register("mcp", "agent_svc.adapters.tools.mcp:build", extra="mcp")
 
 tracers: Registry[Tracer] = Registry("tracing")
+tracers.register("otel", "agent_svc.adapters.tracing.otel:build", extra="otel")
 tracers.register("mlflow", "agent_svc.adapters.tracing.mlflow:build", extra="mlflow")
 
 # --- state, protection, auth: factories take (settings, infra) ---------------------------------

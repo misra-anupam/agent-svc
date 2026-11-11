@@ -38,7 +38,8 @@ async def test_swagger_and_demo_ui_are_not_broken_by_the_csp(settings: Settings)
 
 def prod(**app: object) -> Settings:
     s = Settings(_env_file=None)  # type: ignore[call-arg]
-    s.redis.enabled = False
+    s.redis.enabled = s.postgres.enabled = False
+    s.memory.user_provider = "none"
     s.app.environment = "production"
     s.auth.enabled, s.auth.secret = True, "x" * 40  # type: ignore[assignment]
     for k, v in app.items():

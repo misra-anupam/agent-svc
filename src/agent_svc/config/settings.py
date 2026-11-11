@@ -40,7 +40,7 @@ class RedisSettings(BaseModel):
 
 
 class PostgresSettings(BaseModel):
-    enabled: bool = False
+    enabled: bool = True
     dsn: SecretStr = SecretStr("postgresql://agent:agent@localhost:5432/agent")
     pool_min: int = 0
     pool_max: int = 10
@@ -72,12 +72,24 @@ class ToolsSettings(BaseModel):
 
 
 class TracingSettings(BaseModel):
-    provider: Literal["mlflow"] = "mlflow"
+    provider: Literal["otel", "mlflow"] = "otel"
     service_name: str = "agent-svc"
     # Prompts/answers are NOT recorded unless explicitly enabled (privacy / OWASP LLM02).
     capture_content: bool = False
+    # otel: OTLP/HTTP collector base URL (empty: spans are created but not exported)
+    otlp_endpoint: str = "http://localhost:4318"
+    otlp_headers: dict[str, str] = Field(default_factory=dict)
+    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    # mlflow (tracing.provider=mlflow)
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment: str = "agent-svc"
+
+
+class MetricsSettings(BaseModel):
+    """OpenTelemetry metrics, exported over OTLP to ``tracing.otlp_endpoint``."""
+
+    enabled: bool = True
+    export_interval_seconds: float = Field(default=15.0, gt=0)
 
 
 class PromptStoreSettings(BaseModel):
@@ -99,18 +111,6 @@ class EvalSettings(BaseModel):
     judge_model: str = ""
 
 
-class HttpRailSettings(BaseModel):
-    """A guardrail served by a sidecar over HTTP (Llama Guard, Prompt Guard, NeMo Guardrails)."""
-
-    url: str = ""
-    api_key: SecretStr | None = None
-    model: str = ""
-    timeout_seconds: float = 5.0
-    threshold: float = 0.5  # classifier score at/above which the rail blocks
-    config_id: str = ""  # NeMo Guardrails config
-    refusal_markers: list[str] = ["I'm sorry, I can't respond to that."]  # NeMo: bot refusal text
-
-
 class TierPolicy(BaseModel):
     """Per-tier override. ``None`` lists inherit the global ``enabled_*`` selection."""
 
@@ -121,12 +121,8 @@ class TierPolicy(BaseModel):
 
 class GuardrailSettings(BaseModel):
     enabled: bool = True
-    enabled_input: list[
-        Literal["builtin", "presidio", "prompt_guard", "guardrails_ai", "nemo", "llm_guard"]
-    ] = ["builtin"]
-    enabled_output: list[
-        Literal["builtin", "presidio", "llama_guard", "guardrails_ai", "nemo", "llm_guard"]
-    ] = ["builtin"]
+    enabled_input: list[Literal["builtin"]] = ["builtin"]
+    enabled_output: list[Literal["builtin"]] = ["builtin"]
     # A rail that errors or times out: "closed" blocks the request, "open" lets it through.
     fail_mode: Literal["closed", "open"] = "closed"
     max_input_chars: int = 8_000
@@ -137,33 +133,13 @@ class GuardrailSettings(BaseModel):
     output_mode: Literal["buffer", "stream"] = "buffer"
     stream_check_chars: int = 400
     tier_policy: dict[str, TierPolicy] = Field(default_factory=dict)
-    # presidio
-    presidio_model: str = "en_core_web_sm"
-    presidio_entities: list[str] = [
-        "EMAIL_ADDRESS",
-        "CREDIT_CARD",
-        "PHONE_NUMBER",
-        "US_SSN",
-        "IBAN_CODE",
-        "IP_ADDRESS",
-    ]
-    presidio_threshold: float = 0.5
-    presidio_action: Literal["redact", "block"] = "redact"
-    # guardrails_ai: "module:attr" factories returning a Validator (Hub validators work too)
-    guardrails_ai_validators: list[str] = []
-    # llm_guard (archived upstream; kept for existing users): scanner class names
-    llm_guard_input_scanners: list[str] = ["PromptInjection"]
-    llm_guard_output_scanners: list[str] = ["Sensitive"]
-    llama_guard: HttpRailSettings = Field(default_factory=HttpRailSettings)
-    prompt_guard: HttpRailSettings = Field(default_factory=HttpRailSettings)
-    nemo: HttpRailSettings = Field(default_factory=HttpRailSettings)
 
 
 class MemorySettings(BaseModel):
-    """ "none" thread memory = stateless: clients send the full history on each request."""
+    """User memory is on (Postgres). "none" thread memory = stateless: clients send the history."""
 
     thread_provider: Literal["none", "inmemory", "redis"] = "none"
-    user_provider: Literal["none", "inmemory", "postgres"] = "none"
+    user_provider: Literal["none", "inmemory", "postgres"] = "postgres"
     long_term_provider: Literal["none", "inmemory", "pgvector"] = "none"
     thread_ttl_seconds: int = 86_400
     max_thread_messages: int = 200
@@ -257,6 +233,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     orchestrator: OrchestratorSettings = Field(default_factory=OrchestratorSettings)
     tracing: TracingSettings = Field(default_factory=TracingSettings)
+    metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     prompts: PromptStoreSettings = Field(default_factory=PromptStoreSettings)
     evaluation: EvalSettings = Field(default_factory=EvalSettings)
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)

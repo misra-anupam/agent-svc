@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import fakeredis
 import httpx
 import pytest
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 
 import agent_svc.adapters.registries as registries
 from agent_svc.adapters.infra.redis import RedisResource
@@ -18,17 +19,37 @@ from tests.helpers import RecordingTracer
 from tests.scripted import ScriptedModel
 
 
+@pytest.fixture(scope="session")
+def metric_reader() -> InMemoryMetricReader:
+    """One in-memory reader behind the global MeterProvider (it can be set only once)."""
+    from opentelemetry import metrics as otel_metrics
+    from opentelemetry.sdk.metrics import MeterProvider
+
+    reader = InMemoryMetricReader()
+    otel_metrics.set_meter_provider(MeterProvider(metric_readers=[reader]))
+    return reader
+
+
+@pytest.fixture(autouse=True)
+def _metrics_provider(metric_reader: InMemoryMetricReader) -> None:
+    """Make sure the in-memory provider is installed for every test."""
+
+
 @pytest.fixture(autouse=True)
 def _recording_tracer(monkeypatch: pytest.MonkeyPatch) -> None:
-    """MLflow is the only tracer; tests swap in a recorder unless the tracking URI is empty."""
+    """Swap in a recorder for both tracers (MLflow keeps its real build if the URI is empty)."""
     from agent_svc.adapters.tracing import mlflow as mlflow_tracing
 
-    real = mlflow_tracing.build
+    real_mlflow = mlflow_tracing.build
     monkeypatch.setitem(
         registries.tracers._factories,
         "mlflow",
-        (lambda s: real(s) if not s.tracing.mlflow_tracking_uri else RecordingTracer(), None),
+        (
+            lambda s: real_mlflow(s) if not s.tracing.mlflow_tracking_uri else RecordingTracer(),
+            None,
+        ),
     )
+    monkeypatch.setitem(registries.tracers._factories, "otel", (lambda s: RecordingTracer(), None))
 
 
 @pytest.fixture
@@ -36,6 +57,9 @@ def settings() -> Settings:
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     s.app.environment = "test"
     s.app.log_json = False
+    s.metrics.enabled = False  # tests read metrics from an in-memory reader instead
+    s.postgres.enabled = False  # user memory is on by default; tests opt in explicitly
+    s.memory.user_provider = "none"
     s.redis.enabled = False  # tests inject a fakeredis resource instead
     return s
 

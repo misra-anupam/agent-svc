@@ -53,23 +53,6 @@ async def test_guardrails_can_be_switched_off(settings, make_client) -> None:  #
     assert "run.error" not in kinds and "step.started" not in kinds
 
 
-async def test_unknown_rail_extra_fails_startup_with_the_uv_hint(settings, make_client) -> None:  # type: ignore[no-untyped-def]
-    import pytest
-
-    from agent_svc.domain.exceptions import ConfigurationError
-
-    settings.guardrails.enabled_input = ["llm_guard"]
-    import sys
-
-    sys.modules["llm_guard"] = None  # type: ignore[assignment]
-    try:
-        with pytest.raises(ConfigurationError, match="uv pip install llm-guard"):
-            async with make_client():
-                pass
-    finally:
-        del sys.modules["llm_guard"]
-
-
 async def test_per_tier_policy_disables_guardrails_for_that_tier(settings, make_client) -> None:  # type: ignore[no-untyped-def]
     settings.guardrails.tier_policy = {"free": TierPolicy(enabled=False)}  # default tier is "free"
     async with make_client(llms("fine")) as c:

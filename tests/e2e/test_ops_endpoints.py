@@ -39,12 +39,6 @@ async def test_unknown_route_is_problem_json(client: httpx.AsyncClient) -> None:
     assert r.json()["code"] == "http_404" and r.json()["request_id"]
 
 
-async def test_metrics_exposed(client: httpx.AsyncClient) -> None:
-    await client.get("/healthz")
-    r = await client.get("/metrics/")
-    assert "agent_http_requests_total" in r.text
-
-
 async def test_readiness_503_when_required_dependency_down(settings: Settings) -> None:
     class Down(RedisResource):
         async def ping(self) -> bool:
@@ -89,3 +83,19 @@ async def test_missing_extra_fails_startup_clearly(
 async def test_demo_ui_served_outside_production(client: httpx.AsyncClient) -> None:
     r = await client.get("/ui")
     assert r.status_code == 200 and "agent-svc demo" in r.text
+
+
+async def test_selected_user_memory_fails_startup_clearly_when_postgres_is_down(  # type: ignore[no-untyped-def]
+    settings: Settings,
+) -> None:
+    from pydantic import SecretStr
+
+    from agent_svc.domain.exceptions import UnavailableError
+
+    settings.postgres.enabled = True
+    settings.postgres.dsn = SecretStr("postgresql://agent:agent@127.0.0.1:1/agent")
+    settings.memory.user_provider = "postgres"
+    app = create_app(settings, Container(settings))
+    with pytest.raises(UnavailableError, match="memory needs Postgres"):
+        async with app.router.lifespan_context(app):
+            pass

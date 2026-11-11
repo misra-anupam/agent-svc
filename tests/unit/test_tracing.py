@@ -3,9 +3,14 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 from tests.helpers import RecordingTracer, make_request
 
 from agent_svc.adapters.tracing.mlflow import MlflowTracer
+from agent_svc.adapters.tracing.otel import OtelTracer
 from agent_svc.adapters.tracing.traced_runner import TracedRunner
 from agent_svc.config.settings import TracingSettings
 from agent_svc.domain.exceptions import UpstreamError
@@ -134,3 +139,34 @@ def test_mlflow_adapter_calls_sdk_with_types_and_parent() -> None:
     assert calls[0]["span_type"] == "AGENT" and calls[0]["parent_span"] is None
     assert calls[1]["span_type"] == "TOOL" and calls[1]["parent_span"] is root._span
     assert root.trace_id == "tr-1"
+
+
+def _otel() -> tuple[OtelTracer, InMemorySpanExporter]:
+    exp = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exp))
+    return OtelTracer(provider, "svc"), exp
+
+
+def test_otel_adapter_exports_parented_spans_with_error_status() -> None:
+    tr, exp = _otel()
+    root = tr.start_span("agent.run", attributes={"a": 1, "obj": {"x": 1}})
+    child = tr.start_span("tool:x", parent=root, attributes={"step.kind": "tool"})
+    child.record_error(RuntimeError("bad"))
+    child.end()
+    root.end()
+    spans = {s.name: s for s in exp.get_finished_spans()}
+    assert spans["tool:x"].parent.span_id == spans["agent.run"].context.span_id  # type: ignore[union-attr]
+    assert spans["tool:x"].context.trace_id == spans["agent.run"].context.trace_id
+    assert spans["tool:x"].status.status_code is StatusCode.ERROR
+    assert spans["agent.run"].attributes["obj"] == "{'x': 1}" and root.trace_id == child.trace_id
+
+
+def test_otel_root_span_joins_the_callers_trace_via_traceparent() -> None:
+    tr, exp = _otel()
+    tp = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+    root = tr.start_span("agent.run", remote_parent=tp)
+    root.end()
+    (span,) = exp.get_finished_spans()
+    assert root.trace_id == "0af7651916cd43dd8448eb211c80319c"
+    assert format(span.parent.span_id, "016x") == "b7ad6b7169203331"  # type: ignore[union-attr]

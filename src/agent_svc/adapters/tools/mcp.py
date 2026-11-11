@@ -3,7 +3,8 @@ tools through the framework-neutral ToolProvider port.
 
 Security (OWASP A10 SSRF / LLM03 supply chain / LLM06 excessive agency):
 * servers come only from operator config, never from model or user input;
-* HTTP servers must be on ``mcp.allowed_hosts``; redirects are not followed;
+* HTTP servers must be on ``mcp.allowed_hosts``; redirects off the server's origin are never
+  followed (mcp>=2 enforces it);
 * cloud metadata endpoints are refused even when listed;
 * tool names are namespaced ``<server>__<tool>`` so a server cannot shadow a local tool.
 """
@@ -13,11 +14,10 @@ from __future__ import annotations
 import asyncio
 import re
 from contextlib import AsyncExitStack
-from datetime import timedelta
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 import structlog
 
 from agent_svc.config.settings import McpServerConfig, McpSettings, Settings
@@ -50,11 +50,11 @@ def assert_url_allowed(url: str, allowed_hosts: list[str]) -> None:
 
 def _no_redirect_client(
     headers: dict[str, str] | None = None, timeout: Any = None, auth: Any = None
-) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
+) -> httpx2.AsyncClient:
+    return httpx2.AsyncClient(
         follow_redirects=False,
         headers=headers,
-        timeout=timeout or httpx.Timeout(30.0, read=300.0),
+        timeout=timeout or httpx2.Timeout(30.0, read=300.0),
         auth=auth,
     )
 
@@ -80,7 +80,7 @@ class McpToolProvider:
         self._specs: dict[
             str, tuple[str, str, ToolSpec]
         ] = {}  # exposed name -> (server, tool, spec)
-        self._read_timeout = timedelta(seconds=max(cfg.connect_timeout_seconds, 30))
+        self._read_timeout = float(max(cfg.connect_timeout_seconds, 30))
         self._task: asyncio.Task[None] | None = None
         self._ready = asyncio.Event()
         self._stop = asyncio.Event()
@@ -145,7 +145,7 @@ class McpToolProvider:
             from mcp.client.streamable_http import streamable_http_client
 
             http = await stack.enter_async_context(_no_redirect_client())  # we own its lifetime
-            read, write, _ = await stack.enter_async_context(
+            read, write = await stack.enter_async_context(
                 streamable_http_client(server.url, http_client=http)
             )
         session = await stack.enter_async_context(ClientSession(read, write))
@@ -165,7 +165,7 @@ class McpToolProvider:
                     ToolSpec(
                         exposed,
                         t.description or t.name,
-                        dict(t.inputSchema or {"type": "object"}),
+                        dict(t.input_schema or {"type": "object"}),
                         source=f"mcp:{server}",
                     ),
                 )
@@ -190,11 +190,15 @@ class McpToolProvider:
         result = await self._sessions[server].call_tool(
             tool, arguments, read_timeout_seconds=self._read_timeout
         )
+        from mcp.types import CallToolResult, TextContent
+
+        if not isinstance(result, CallToolResult):  # e.g. the server asks for interactive input
+            raise ToolExecutionError(f"MCP tool {name!r} needs interactive input (unsupported)")
         text = "\n".join(
-            c.text if getattr(c, "type", "") == "text" else f"[{getattr(c, 'type', 'content')}]"
+            c.text if isinstance(c, TextContent) else f"[{getattr(c, 'type', 'content')}]"
             for c in result.content
         )
-        if result.isError:
+        if result.is_error:
             raise ToolExecutionError(text or f"MCP tool {name!r} reported an error")
         return text
 

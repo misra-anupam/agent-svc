@@ -33,6 +33,8 @@ def _configure(settings: Settings, *, orchestrator: str | None) -> None:
     settings.redis.enabled = settings.postgres.enabled = False
     settings.ratelimit.provider = "none"
     settings.auth.enabled = False
+    settings.metrics.enabled = False
+    settings.tracing.provider = "mlflow"  # harness traces go to the local sqlite store, not OTLP
     if not settings.tracing.mlflow_tracking_uri.startswith(("sqlite", "file")):
         settings.tracing.mlflow_tracking_uri = settings.evaluation.mlflow_tracking_uri or (
             "sqlite:///evals/.mlflow/mlflow.db"

@@ -13,6 +13,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Adapter map: adapter-map.md
   - Configuration & presets: how-to/presets.md
   - How-to:
       - Add an adapter: how-to/add-adapter.md

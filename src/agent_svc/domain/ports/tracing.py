@@ -12,10 +12,19 @@ class Span(Protocol):
 
 
 class Tracer(Protocol):
-    """Backend-neutral tracing. Implementation: mlflow."""
+    """Backend-neutral tracing. Implementations: otel (default), mlflow.
+
+    ``remote_parent`` is the caller's W3C ``traceparent`` header; backends that support
+    distributed tracing use it as the parent of a root span, others ignore it.
+    """
 
     def start_span(
-        self, name: str, *, parent: Span | None = None, attributes: dict[str, Any] | None = None
+        self,
+        name: str,
+        *,
+        parent: Span | None = None,
+        attributes: dict[str, Any] | None = None,
+        remote_parent: str | None = None,
     ) -> Span: ...
 
     async def flush(self) -> None: ...

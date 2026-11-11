@@ -67,10 +67,10 @@ class AdmissionService:
                 and self._s.mode == "throttle"
                 and delay_ms <= self._s.max_throttle_delay_ms
             ):
-                RATE_LIMITED.labels("throttled", tier_name).inc()
+                RATE_LIMITED.add(1, {"reason": "throttled", "tier": tier_name})
                 await asyncio.sleep(d.retry_after_seconds)  # throttle: delay instead of reject
                 continue
-            RATE_LIMITED.labels("rate", tier_name).inc()
+            RATE_LIMITED.add(1, {"reason": "rate", "tier": tier_name})
             raise RateLimitedError(
                 "rate limit exceeded", retry_after=max(1, math.ceil(d.retry_after_seconds))
             )
@@ -84,7 +84,7 @@ class AdmissionService:
         for key, limit in checks:
             d = await self._budget.check(key, limit=limit)
             if not d.allowed:
-                RATE_LIMITED.labels("budget", tier_name).inc()
+                RATE_LIMITED.add(1, {"reason": "budget", "tier": tier_name})
                 raise BudgetExceededError(
                     "daily token budget exhausted",
                     retry_after=max(1, math.ceil(d.retry_after_seconds)),
@@ -97,7 +97,7 @@ class AdmissionService:
             p.rate_key, limit=tier.max_concurrent, lease_seconds=self._s.concurrency_lease_seconds
         )
         if lease is None:
-            RATE_LIMITED.labels("concurrency", tier_name).inc()
+            RATE_LIMITED.add(1, {"reason": "concurrency", "tier": tier_name})
             raise RateLimitedError("too many concurrent runs", retry_after=1)
         return Admission(gate_key=p.rate_key, lease=lease)
 

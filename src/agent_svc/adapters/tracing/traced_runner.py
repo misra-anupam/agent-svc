@@ -43,6 +43,7 @@ class TracedRunner:
                 "user.tier": p.tier,
                 **({"input": request.last_user_text} if self._capture else {}),
             },
+            remote_parent=request.metadata.get("traceparent"),
         )
         if root.trace_id:
             structlog.contextvars.bind_contextvars(trace_id=root.trace_id)

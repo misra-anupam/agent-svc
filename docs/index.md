@@ -10,8 +10,8 @@ every concern behind a port you can swap by configuration.
 | Tools | local tools, MCP servers (stdio / streamable-http) |
 | State | thread (Redis), user (Postgres), long-term (pgvector) memory |
 | Protection | tiered rate limits, token budgets, concurrency caps, JWT, answer cache (exact + optional semantic) |
-| Guardrails | builtin, Presidio, Guardrails AI, Prompt Guard, Llama Guard, NeMo, LLM Guard (deprecated) |
-| Observability | MLflow traces, Prometheus, Grafana, Loki |
+| Guardrails | builtin (injection heuristics, secret redaction, output handling) |
+| Observability | OpenTelemetry traces and metrics (OTLP; Jaeger in compose); MLflow optional |
 | Prompts / evals | MLflow prompt registry and MLflow GenAI evaluator |
 
 ```bash

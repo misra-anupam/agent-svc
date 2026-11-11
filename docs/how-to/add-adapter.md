@@ -16,7 +16,7 @@ make new-adapter PORT=guardrails NAME=acme      # generates the stubs below
     ```
 
 3. **Add the extra** to `pyproject.toml` and run `uv lock`. If its pins conflict with the lock, leave it
-   out of `pyproject.toml` and document `uv pip install ...` (as `llm_guard` does).
+   out of `pyproject.toml` and document `uv pip install ...`.
 4. **Add the selector** to the matching `Literal[...]` in `config/settings.py` where one exists.
 5. **Test it**: run the shared contract/adversarial suites against it.
     * orchestrators: append the name to `PROVIDERS` in `tests/contract/test_orchestrator_contract.py`
@@ -41,4 +41,4 @@ The registry loads the `agent_svc.<port>` group the first time an unknown name i
 * A rail/evaluator/store that cannot reach its backend raises; policy (fail closed/open) is applied by
   the caller, not swallowed in the adapter.
 * Blocking SDK calls go through `anyio.to_thread.run_sync`.
-* Never send user content to a third party by default (see how `guardrails_ai` disables telemetry).
+* Never send user content to a third party by default (disable vendor telemetry).

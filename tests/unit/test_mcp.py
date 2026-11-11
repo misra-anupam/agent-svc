@@ -38,7 +38,7 @@ async def test_stdio_lists_namespaced_tools_with_mcp_source(stdio_provider) -> N
 
 async def test_stdio_call_and_error_mapping(stdio_provider) -> None:  # type: ignore[no-untyped-def]
     assert await stdio_provider.call("demo__add", {"a": 2, "b": 3}) == "5"
-    with pytest.raises(ToolExecutionError, match="kaboom"):
+    with pytest.raises(ToolExecutionError, match="boom"):
         await stdio_provider.call("demo__boom", {})
     with pytest.raises(ToolExecutionError, match="unknown MCP tool"):
         await stdio_provider.call("demo__nope", {})

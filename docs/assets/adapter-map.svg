@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1186 842" role="img" aria-label="Mind map: the core in the centre-left connects to six groups of ports; each port connects to the adapters that implement it, with decorators shown dashed.">
+<defs><marker id="dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5"><circle cx="3" cy="3" r="2.2" fill="currentColor"/></marker></defs><style>text{font-family:Inter,-apple-system,Segoe UI,Helvetica,Arial,sans-serif}.edge{fill:none;stroke:#9fb0bd;stroke-width:1.4}.n-r{fill:#0d6b63}.t-r{fill:#fff;font-weight:600;font-size:17px;letter-spacing:.06em}.t-rs{fill:#fff;font-size:12px;opacity:.9}.n-g{fill:#dbe8e6}.t-g{fill:#0b3f3a;font-weight:600;font-size:13px}.n-p{fill:#fff;stroke:#0d6b63;stroke-width:1.5}.t-p{fill:#14202b;font-weight:600;font-size:12.5px}.n-a{fill:#e8edf1}.t-a{fill:#14202b;font-size:12px}.n-d{fill:#fbf1e2;stroke:#a15c0b;stroke-width:1.3;stroke-dasharray:5 3}.t-d{fill:#7a4506;font-weight:500;font-size:12px}</style>
+<path class="edge" d="M626.0,58.0 C648.0,58.0 648.0,41.0 670.0,41.0"/>
+<path class="edge" d="M626.0,58.0 C648.0,58.0 648.0,75.0 670.0,75.0"/>
+<path class="edge" d="M380.0,58.0 C396.0,58.0 396.0,58.0 412.0,58.0"/>
+<path class="edge" d="M626.0,142.0 C648.0,142.0 648.0,125.0 670.0,125.0"/>
+<path class="edge" d="M626.0,142.0 C648.0,142.0 648.0,159.0 670.0,159.0"/>
+<path class="edge" d="M626.0,227.0 C648.0,227.0 648.0,193.0 670.0,193.0"/>
+<path class="edge" d="M626.0,227.0 C648.0,227.0 648.0,227.0 670.0,227.0"/>
+<path class="edge" d="M626.0,227.0 C648.0,227.0 648.0,261.0 670.0,261.0"/>
+<path class="edge" d="M380.0,184.5 C396.0,184.5 396.0,142.0 412.0,142.0"/>
+<path class="edge" d="M380.0,184.5 C396.0,184.5 396.0,227.0 412.0,227.0"/>
+<path class="edge" d="M626.0,311.0 C648.0,311.0 648.0,311.0 670.0,311.0"/>
+<path class="edge" d="M626.0,345.0 C648.0,345.0 648.0,345.0 670.0,345.0"/>
+<path class="edge" d="M626.0,379.0 C648.0,379.0 648.0,379.0 670.0,379.0"/>
+<path class="edge" d="M626.0,413.0 C648.0,413.0 648.0,413.0 670.0,413.0"/>
+<path class="edge" d="M626.0,447.0 C648.0,447.0 648.0,447.0 670.0,447.0"/>
+<path class="edge" d="M626.0,481.0 C648.0,481.0 648.0,481.0 670.0,481.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,311.0 412.0,311.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,345.0 412.0,345.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,379.0 412.0,379.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,413.0 412.0,413.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,447.0 412.0,447.0"/>
+<path class="edge" d="M380.0,396.0 C396.0,396.0 396.0,481.0 412.0,481.0"/>
+<path class="edge" d="M626.0,531.0 C648.0,531.0 648.0,531.0 670.0,531.0"/>
+<path class="edge" d="M626.0,565.0 C648.0,565.0 648.0,565.0 670.0,565.0"/>
+<path class="edge" d="M380.0,548.0 C396.0,548.0 396.0,531.0 412.0,531.0"/>
+<path class="edge" d="M380.0,548.0 C396.0,548.0 396.0,565.0 412.0,565.0"/>
+<path class="edge" d="M626.0,615.0 C648.0,615.0 648.0,615.0 670.0,615.0"/>
+<path class="edge" d="M626.0,649.0 C648.0,649.0 648.0,649.0 670.0,649.0"/>
+<path class="edge" d="M626.0,683.0 C648.0,683.0 648.0,683.0 670.0,683.0"/>
+<path class="edge" d="M626.0,717.0 C648.0,717.0 648.0,717.0 670.0,717.0"/>
+<path class="edge" d="M380.0,666.0 C396.0,666.0 396.0,615.0 412.0,615.0"/>
+<path class="edge" d="M380.0,666.0 C396.0,666.0 396.0,649.0 412.0,649.0"/>
+<path class="edge" d="M380.0,666.0 C396.0,666.0 396.0,683.0 412.0,683.0"/>
+<path class="edge" d="M380.0,666.0 C396.0,666.0 396.0,717.0 412.0,717.0"/>
+<path class="edge" d="M626.0,767.0 C648.0,767.0 648.0,767.0 670.0,767.0"/>
+<path class="edge" d="M626.0,801.0 C648.0,801.0 648.0,801.0 670.0,801.0"/>
+<path class="edge" d="M380.0,784.0 C396.0,784.0 396.0,767.0 412.0,767.0"/>
+<path class="edge" d="M380.0,784.0 C396.0,784.0 396.0,801.0 412.0,801.0"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,58.0 214.0,58.0"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,184.5 214.0,184.5"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,396.0 214.0,396.0"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,548.0 214.0,548.0"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,666.0 214.0,666.0"/>
+<path class="edge" d="M166.0,421.0 C190.0,421.0 190.0,784.0 214.0,784.0"/>
+<rect class="n-a" x="670" y="28.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="45.0">LiteLLMClient → OpenRouter (llm.provider)</text>
+<rect class="n-d" x="670" y="62.0" width="500" height="26" rx="7"/>
+<text class="t-d" x="680" y="79.0">wrapped by Breaker → Retry → Fallback → Metered</text>
+<rect class="n-p" x="412" y="45.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="62.0">LLMClient</text>
+<rect class="n-g" x="214" y="45.0" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="62.0">Model call</text>
+<rect class="n-a" x="670" y="112.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="129.0">LangGraphRunner, via the PortChatModel bridge</text>
+<rect class="n-d" x="670" y="146.0" width="500" height="26" rx="7"/>
+<text class="t-d" x="680" y="163.0">wrapped by Traced → Cached → Guarded</text>
+<rect class="n-p" x="412" y="129.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="146.0">AgentRunner</text>
+<rect class="n-a" x="670" y="180.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="197.0">Local tools (calculator, current_time)</text>
+<rect class="n-a" x="670" y="214.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="231.0">McpToolProvider (SSRF host allowlist)</text>
+<rect class="n-d" x="670" y="248.0" width="500" height="26" rx="7"/>
+<text class="t-d" x="680" y="265.0">Composite → Guarded: allowlist, schema, timeout, size cap</text>
+<rect class="n-p" x="412" y="214.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="231.0">ToolProvider</text>
+<rect class="n-g" x="214" y="171.5" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="188.5">Agent loop</text>
+<rect class="n-a" x="670" y="298.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="315.0">in-memory · Redis</text>
+<rect class="n-p" x="412" y="298.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="315.0">ThreadMemory</text>
+<rect class="n-a" x="670" y="332.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="349.0">in-memory · Postgres</text>
+<rect class="n-p" x="412" y="332.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="349.0">UserMemory</text>
+<rect class="n-a" x="670" y="366.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="383.0">in-memory · pgvector</text>
+<rect class="n-p" x="412" y="366.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="383.0">LongTermMemory</text>
+<rect class="n-a" x="670" y="400.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="417.0">LiteLLMEmbedder</text>
+<rect class="n-p" x="412" y="400.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="417.0">Embedder</text>
+<rect class="n-a" x="670" y="434.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="451.0">RedisCache + in-process semantic index</text>
+<rect class="n-p" x="412" y="434.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="451.0">Cache</text>
+<rect class="n-a" x="670" y="468.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="485.0">in-memory · Redis (resumable SSE)</text>
+<rect class="n-p" x="412" y="468.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="485.0">RunBuffer</text>
+<rect class="n-g" x="214" y="383.0" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="400.0">State and memory</text>
+<rect class="n-a" x="670" y="518.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="535.0">builtin (injection, secrets, output, prompt leak)</text>
+<rect class="n-p" x="412" y="518.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="535.0">Guardrail</text>
+<rect class="n-a" x="670" y="552.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="569.0">Redis (Lua token bucket, leases, budgets)</text>
+<rect class="n-p" x="412" y="552.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="569.0">RateLimiter · Budget · Gate</text>
+<rect class="n-g" x="214" y="535.0" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="552.0">Protection</text>
+<rect class="n-a" x="670" y="602.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="619.0">OpenTelemetry (OTLP) · MLflow</text>
+<rect class="n-p" x="412" y="602.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="619.0">Tracer</text>
+<rect class="n-a" x="670" y="636.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="653.0">OpenTelemetry instruments → OTLP</text>
+<rect class="n-p" x="412" y="636.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="653.0">Metrics</text>
+<rect class="n-a" x="670" y="670.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="687.0">MLflow registry + TTL cache</text>
+<rect class="n-p" x="412" y="670.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="687.0">PromptStore</text>
+<rect class="n-a" x="670" y="704.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="721.0">mlflow_genai (golden-dataset gate)</text>
+<rect class="n-p" x="412" y="704.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="721.0">Evaluator</text>
+<rect class="n-g" x="214" y="653.0" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="670.0">Observe and improve</text>
+<rect class="n-a" x="670" y="754.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="771.0">JWT (pinned algorithm) · noauth</text>
+<rect class="n-p" x="412" y="754.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="771.0">Authenticator</text>
+<rect class="n-a" x="670" y="788.0" width="500" height="26" rx="7"/>
+<text class="t-a" x="680" y="805.0">RedisResource · PostgresResource</text>
+<rect class="n-p" x="412" y="788.0" width="214" height="26" rx="7"/>
+<text class="t-p" x="422" y="805.0">Resource · HealthCheck</text>
+<rect class="n-g" x="214" y="771.0" width="166" height="26" rx="7"/>
+<text class="t-g" x="224" y="788.0">Edge</text>
+<rect class="n-r" x="16" y="384.0" width="150" height="74" rx="12"/>
+<text class="t-r" x="91.0" y="413.0" text-anchor="middle">CORE</text>
+<text class="t-rs" x="91.0" y="430.0" text-anchor="middle">domain ports</text>
+<text class="t-rs" x="91.0" y="445.0" text-anchor="middle">+ application</text>
+</svg>

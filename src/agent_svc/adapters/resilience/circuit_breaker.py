@@ -52,7 +52,7 @@ class CircuitBreaker:
         self._failures = 0
         self._opened_at = 0.0
         self._probe_in_flight = False
-        BREAKER_STATE.labels(name).set(0)
+        BREAKER_STATE.set(0, {"name": name})
 
     @property
     def state(self) -> BreakerState:
@@ -65,8 +65,8 @@ class CircuitBreaker:
             return
         log.warning("breaker_transition", breaker=self.name, to=to.name)
         self._state = to
-        BREAKER_STATE.labels(self.name).set(int(to))
-        BREAKER_TRANSITIONS.labels(self.name, to.name.lower()).inc()
+        BREAKER_STATE.set(int(to), {"name": self.name})
+        BREAKER_TRANSITIONS.add(1, {"name": self.name, "to": to.name.lower()})
 
     def _acquire(self) -> bool:
         """Returns True if this call is the half-open probe."""

@@ -17,7 +17,7 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 
 
 class RequestContextMiddleware:
-    """Request-id propagation, access log, Prometheus HTTP metrics, security headers."""
+    """Request-id propagation, access log, OpenTelemetry HTTP metrics, security headers."""
 
     # Pages that legitimately load scripts/styles (Swagger UI, demo UI) get no CSP.
     _CSP_EXEMPT = ("/docs", "/ui", "/openapi.json")
@@ -42,7 +42,7 @@ class RequestContextMiddleware:
 
         start = time.perf_counter()
         status = 500
-        HTTP_INFLIGHT.inc()
+        HTTP_INFLIGHT.add(1)
 
         async def send_wrapper(message: Message) -> None:
             nonlocal status
@@ -69,14 +69,12 @@ class RequestContextMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
         finally:
-            HTTP_INFLIGHT.dec()
+            HTTP_INFLIGHT.add(-1)
             route = getattr(scope.get("route"), "path", "unmatched")
-            if scope["path"].startswith("/metrics"):  # mounted ASGI app: no APIRoute
-                route = "/metrics"
             elapsed = time.perf_counter() - start
-            HTTP_REQUESTS.labels(req.method, route, str(status)).inc()
-            HTTP_LATENCY.labels(req.method, route).observe(elapsed)
-            if route not in ("/healthz", "/readyz", "/metrics"):
+            HTTP_REQUESTS.add(1, {"method": req.method, "route": route, "status": str(status)})
+            HTTP_LATENCY.record(elapsed, {"method": req.method, "route": route})
+            if route not in ("/healthz", "/readyz"):
                 structlog.get_logger().info(
                     "http_request",
                     method=req.method,

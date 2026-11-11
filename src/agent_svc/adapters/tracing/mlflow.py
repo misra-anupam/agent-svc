@@ -50,7 +50,12 @@ class MlflowTracer:
         self._m = mlflow_module
 
     def start_span(
-        self, name: str, *, parent: Any = None, attributes: dict[str, Any] | None = None
+        self,
+        name: str,
+        *,
+        parent: Any = None,
+        attributes: dict[str, Any] | None = None,
+        remote_parent: str | None = None,  # MLflow has no W3C propagation; ignored
     ) -> MlflowSpan:
         attrs = dict(attributes or {})
         kind = str(attrs.get("step.kind", "agent"))

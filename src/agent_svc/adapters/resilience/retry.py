@@ -28,7 +28,7 @@ def make_retrying(
     provider: str, *, max_attempts: int = 3, initial: float = 0.5, max_wait: float = 8.0
 ) -> AsyncRetrying:
     def _count(state: RetryCallState) -> None:
-        LLM_RETRIES.labels(provider).inc()
+        LLM_RETRIES.add(1, {"provider": provider})
 
     log_sleep = before_sleep_log(_stdlib_log, logging.WARNING)
 

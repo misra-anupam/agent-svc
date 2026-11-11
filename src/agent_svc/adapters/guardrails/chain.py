@@ -66,8 +66,8 @@ class GuardrailChain:
                     action, current, rail.name, f"rail_error:{type(exc).__name__}"
                 )
             ms = int((time.perf_counter() - started) * 1000)
-            GUARDRAIL_CHECKS.labels(rail.name, stage.value, res.action).inc()
-            GUARDRAIL_LATENCY.labels(rail.name, stage.value).observe(ms / 1000)
+            GUARDRAIL_CHECKS.add(1, {"rail": rail.name, "stage": stage.value, "action": res.action})
+            GUARDRAIL_LATENCY.record(ms / 1000, {"rail": rail.name, "stage": stage.value})
             trail.append(RailTrace(rail.name, res.action, res.reason, ms))
             if res.action == "block":
                 return ChainOutcome(

@@ -110,7 +110,7 @@ class FallbackLLM:
             yield chunk
 
     def _note_fallback(self, exc: DomainError) -> None:
-        LLM_FALLBACKS.labels(self._name).inc()
+        LLM_FALLBACKS.add(1, {"from_model": self._name})
         log.warning("llm_fallback", primary=self._name, reason=exc.code)
 
 
@@ -126,11 +126,15 @@ class MeteredLLM:
         try:
             resp = await self._inner.complete(messages, model=model, **params)
         except BaseException:
-            LLM_CALLS.labels(self._name, "error").inc()
+            LLM_CALLS.add(1, {"model": self._name, "outcome": "error"})
             raise
-        LLM_CALLS.labels(resp.model or self._name, "ok").inc()
-        LLM_TOKENS.labels(resp.model or self._name, "input").inc(resp.usage.input_tokens)
-        LLM_TOKENS.labels(resp.model or self._name, "output").inc(resp.usage.output_tokens)
+        LLM_CALLS.add(1, {"model": resp.model or self._name, "outcome": "ok"})
+        LLM_TOKENS.add(
+            resp.usage.input_tokens, {"model": resp.model or self._name, "direction": "input"}
+        )
+        LLM_TOKENS.add(
+            resp.usage.output_tokens, {"model": resp.model or self._name, "direction": "output"}
+        )
         return resp
 
     async def stream(
@@ -140,10 +144,10 @@ class MeteredLLM:
             async for chunk in self._inner.stream(messages, model=model, **params):
                 if chunk.usage:
                     m = chunk.model or self._name
-                    LLM_TOKENS.labels(m, "input").inc(chunk.usage.input_tokens)
-                    LLM_TOKENS.labels(m, "output").inc(chunk.usage.output_tokens)
+                    LLM_TOKENS.add(chunk.usage.input_tokens, {"model": m, "direction": "input"})
+                    LLM_TOKENS.add(chunk.usage.output_tokens, {"model": m, "direction": "output"})
                 yield chunk
         except BaseException:
-            LLM_CALLS.labels(self._name, "error").inc()
+            LLM_CALLS.add(1, {"model": self._name, "outcome": "error"})
             raise
-        LLM_CALLS.labels(self._name, "ok").inc()
+        LLM_CALLS.add(1, {"model": self._name, "outcome": "ok"})

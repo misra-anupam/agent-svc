@@ -1,5 +1,5 @@
-# MLflow (traces + prompts + evals) and Redis always run. Profiles: lgtm | mcp-demo | guardrails | guardrails-gpu
-#   e.g.  docker compose --profile lgtm up
+# Always on: api, redis, postgres, otel-collector + jaeger (traces, UI :16686), mlflow (prompts + evals, UI :5001).
+# Optional profiles: mcp-demo   (docker compose --profile <name> up)
 name: agent-svc
 services:
   api:
@@ -7,26 +7,17 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        EXTRAS: ${AGENT_EXTRAS:---extra litellm --extra langgraph --extra mlflow --extra mlflow_genai}
+        EXTRAS: ${AGENT_EXTRAS:---extra litellm --extra langgraph --extra otel --extra mlflow --extra mlflow_genai}
     env_file: [../env/local-min.env]
     environment:
       AGENT_REDIS__URL: redis://redis:6379/0
       AGENT_POSTGRES__DSN: postgresql://agent:agent@postgres:5432/agent
-      AGENT_TRACING__MLFLOW_TRACKING_URI: http://mlflow:5000
+      AGENT_TRACING__OTLP_ENDPOINT: http://otel-collector:4318
       AGENT_PROMPTS__MLFLOW_TRACKING_URI: http://mlflow:5000
-      AGENT_ORCHESTRATOR__PROVIDER: ${AGENT_ORCHESTRATOR__PROVIDER:-langgraph}
-      AGENT_LLM__PROVIDER: ${AGENT_LLM__PROVIDER:-litellm}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # MCP: see the mcp-demo profile for a ready-made server (needs `--extra mcp` in AGENT_EXTRAS)
       AGENT_MCP__SERVERS: ${AGENT_MCP__SERVERS:-[]}
       AGENT_MCP__ALLOWED_HOSTS: ${AGENT_MCP__ALLOWED_HOSTS:-[]}
-      AGENT_GUARDRAILS__ENABLED_INPUT: ${AGENT_GUARDRAILS__ENABLED_INPUT:-["builtin"]}
-      AGENT_GUARDRAILS__ENABLED_OUTPUT: ${AGENT_GUARDRAILS__ENABLED_OUTPUT:-["builtin"]}
-      AGENT_GUARDRAILS__PROMPT_GUARD__URL: ${AGENT_GUARDRAILS__PROMPT_GUARD__URL:-http://prompt-guard:80/predict}
-      AGENT_GUARDRAILS__LLAMA_GUARD__URL: ${AGENT_GUARDRAILS__LLAMA_GUARD__URL:-http://llama-guard:8000/v1}
-      AGENT_GUARDRAILS__LLAMA_GUARD__MODEL: ${AGENT_GUARDRAILS__LLAMA_GUARD__MODEL:-meta-llama/Llama-Guard-3-1B}
-      AGENT_GUARDRAILS__NEMO__URL: ${AGENT_GUARDRAILS__NEMO__URL:-http://nemo-guardrails:8000}
-      AGENT_GUARDRAILS__NEMO__CONFIG_ID: ${AGENT_GUARDRAILS__NEMO__CONFIG_ID:-default}
       AGENT_TOOLS__LOCAL: ${AGENT_TOOLS__LOCAL:-["calculator","current_time"]}
     ports: ["8000:8000"]
     depends_on:
@@ -49,81 +40,19 @@ services:
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U agent"], interval: 5s, timeout: 3s, retries: 10}
     volumes: [pg-data:/var/lib/postgresql/data]
 
-  # ---- profile: mcp-demo (FastMCP server on :8080 with add/boom/big tools) --------------------
-  # AGENT_EXTRAS="--extra litellm --extra langgraph --extra mcp" \
-  # AGENT_ORCHESTRATOR__PROVIDER=langgraph \
-  # AGENT_MCP__SERVERS='[{"name":"demo","transport":"streamable_http","url":"http://mcp-demo:8080/mcp"}]' \
-  # AGENT_MCP__ALLOWED_HOSTS='["mcp-demo"]' docker compose --profile mcp-demo up --build
-  mcp-demo:
-    profiles: [mcp-demo]
-    image: python:3.12-slim
-    command: ["sh", "-c", "pip install --no-cache-dir 'mcp>=1.0' && python /srv/mcp_server.py streamable-http 8080"]
-    volumes: [../tests/fixtures/mcp_server.py:/srv/mcp_server.py:ro]
-    expose: ["8080"]
+  # ---- OpenTelemetry: collector (OTLP :4318) -> Jaeger UI on :16686 --------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes: [./otel-collector.yaml:/etc/otel/config.yaml:ro]
+    ports: ["4318:4318"]  # for an API running on the host
+    depends_on: [jaeger]
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment: {COLLECTOR_OTLP_ENABLED: "true"}
+    ports: ["16686:16686"]
 
-  # ---- profile: guardrails (classifier sidecars; CPU) -----------------------------------------
-  # NOT BOOTED in CI: Prompt Guard is a gated model (set HF_TOKEN after accepting Meta's licence).
-  #   AGENT_GUARDRAILS__ENABLED_INPUT='["builtin","prompt_guard"]' docker compose --profile guardrails up
-  prompt-guard:
-    profiles: [guardrails]
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
-    command: ["--model-id", "meta-llama/Prompt-Guard-86M"]
-    environment: {HF_TOKEN: "${HF_TOKEN:-}"}
-    volumes: [hf-cache:/data]
-  # NeMo Guardrails server; mount your rails config (config.yml + Colang) at ./guardrails-config
-  nemo-guardrails:
-    profiles: [guardrails]
-    image: python:3.12-slim
-    command: ["sh", "-c", "pip install --no-cache-dir nemoguardrails && nemoguardrails server --config /config --port 8000"]
-    environment: {NEMO_GUARDRAILS_TELEMETRY: "off", OPENAI_API_KEY: "${OPENAI_API_KEY:-}"}
-    volumes: [./guardrails-config:/config:ro]
-    expose: ["8000"]
-
-  # ---- profile: guardrails-gpu (Llama Guard via vLLM; needs an NVIDIA GPU + HF_TOKEN) ---------
-  llama-guard:
-    profiles: [guardrails-gpu]
-    image: vllm/vllm-openai:v0.6.3
-    command: ["--model", "meta-llama/Llama-Guard-3-1B"]
-    environment: {HUGGING_FACE_HUB_TOKEN: "${HF_TOKEN:-}"}
-    volumes: [hf-cache:/root/.cache/huggingface]
-    deploy:
-      resources:
-        reservations:
-          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
-    expose: ["8000"]
-
-  # ---- profile: lgtm (Prometheus + Grafana + Loki + Promtail; Grafana on :3000) ---------------
-  prometheus:
-    profiles: [lgtm]
-    image: prom/prometheus:v2.55.1
-    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro]
-    ports: ["9090:9090"]
-  loki:
-    profiles: [lgtm]
-    image: grafana/loki:3.2.1
-    command: ["-config.file=/etc/loki/loki.yaml"]
-    volumes: [./loki.yaml:/etc/loki/loki.yaml:ro, loki-data:/loki]
-  promtail:
-    profiles: [lgtm]
-    image: grafana/promtail:3.2.1
-    command: ["-config.file=/etc/promtail/promtail.yaml"]
-    volumes:
-      - ./promtail.yaml:/etc/promtail/promtail.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on: [loki]
-  grafana:
-    profiles: [lgtm]
-    image: grafana/grafana:11.3.0
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports: ["3000:3000"]
-    depends_on: [prometheus, loki]
-
-  # ---- mlflow: traces, prompt registry and eval runs (UI on :5001) ---------------------------
+  # ---- mlflow: prompt registry and eval runs (UI on :5001) ---------------------------------
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.1.1
     command: >
@@ -134,9 +63,18 @@ services:
     volumes: [mlflow-data:/mlflow]
     ports: ["5001:5000"]  # 5000 is taken by AirPlay on macOS
 
+  # ---- profile: mcp-demo (MCP server on :8080 with add/boom/big tools) --------------------
+  # AGENT_EXTRAS="--extra litellm --extra langgraph --extra mcp" \
+  # AGENT_MCP__SERVERS='[{"name":"demo","transport":"streamable_http","url":"http://mcp-demo:8080/mcp"}]' \
+  # AGENT_MCP__ALLOWED_HOSTS='["mcp-demo"]' docker compose --profile mcp-demo up --build
+  mcp-demo:
+    profiles: [mcp-demo]
+    image: python:3.12-slim
+    command: ["sh", "-c", "pip install --no-cache-dir 'mcp>=2.3' && python /srv/mcp_server.py streamable-http 8080"]
+    volumes: [../tests/fixtures/mcp_server.py:/srv/mcp_server.py:ro]
+    expose: ["8080"]
+
 volumes:
   redis-data:
   pg-data:
-  loki-data:
   mlflow-data:
-  hf-cache:

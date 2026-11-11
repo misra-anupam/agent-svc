@@ -57,6 +57,7 @@ async def chat(
     kv: Annotated[Cache | None, Depends(get_kv)],
     idempotency_key: Annotated[str | None, Header(pattern=_IDEM)] = None,
     cache_control: Annotated[str | None, Header()] = None,
+    traceparent: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     cfg = request.app.state.settings.app
     if len(body.messages) > cfg.max_messages_per_request:
@@ -83,7 +84,10 @@ async def chat(
 
     admission = await service.admit(principal)  # 429/503 as proper problem+json responses
     try:
-        metadata = {"no_cache": "no-cache" in (cache_control or "").lower()}
+        metadata = {
+            "no_cache": "no-cache" in (cache_control or "").lower(),
+            "traceparent": traceparent,
+        }
         areq = await service.prepare(thread_id, principal, new, metadata=metadata)
         if store is not None and not await store.set_if_absent(
             idem_key, areq.run_id.encode(), 3600

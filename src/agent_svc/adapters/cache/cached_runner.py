@@ -69,7 +69,7 @@ class CachedRunner:
 
     async def stream(self, request: AgentRequest) -> AsyncIterator[AgentEvent]:
         if self._bypass(request):
-            CACHE_REQUESTS.labels("bypass").inc()
+            CACHE_REQUESTS.add(1, {"result": "bypass"})
             async for ev in self._inner.stream(request):
                 yield ev
             return
@@ -77,7 +77,7 @@ class CachedRunner:
         key = cache_key(request, self._s.scope)
         hit = await self._lookup(key)
         if hit is not None:
-            CACHE_REQUESTS.labels("hit").inc()
+            CACHE_REQUESTS.add(1, {"result": "hit"})
             for ev in self._replay(request, hit):
                 yield ev
             return
@@ -86,7 +86,7 @@ class CachedRunner:
         if self._semantic is not None:
             similar = await self._semantic_lookup(partition, request.last_user_text)
             if similar is not None:
-                CACHE_REQUESTS.labels("semantic_hit").inc()
+                CACHE_REQUESTS.add(1, {"result": "semantic_hit"})
                 for ev in self._replay(request, similar):
                     yield ev
                 return
@@ -97,7 +97,7 @@ class CachedRunner:
         if existing is not None:
             shared = await asyncio.shield(existing)
             if shared is not None:
-                CACHE_REQUESTS.labels("coalesced").inc()
+                CACHE_REQUESTS.add(1, {"result": "coalesced"})
                 for ev in self._replay(request, shared):
                     yield ev
                 return
@@ -106,7 +106,7 @@ class CachedRunner:
             fut = asyncio.get_running_loop().create_future()
             self._inflight[key] = fut
 
-        CACHE_REQUESTS.labels("miss").inc()
+        CACHE_REQUESTS.add(1, {"result": "miss"})
         text, usage, ok = "", Usage(), False
         try:
             async for ev in self._inner.stream(request):
