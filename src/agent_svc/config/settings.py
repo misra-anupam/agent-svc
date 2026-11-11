@@ -24,6 +24,9 @@ class AppSettings(BaseModel):
     agent_name: str = "default"
     agent_version: str = "1.0.0"
     shutdown_grace_seconds: float = 20.0
+    max_messages_per_request: int = 50
+    max_message_chars: int = 20_000
+    sse_heartbeat_seconds: float = 15.0
 
 
 class RedisSettings(BaseModel):

@@ -1,10 +1,11 @@
+from agent_svc.adapters.llm.fake import FakeLLM
 from agent_svc.adapters.registries import build_runner
 from agent_svc.config import Settings
 from agent_svc.domain.models import AgentRequest, Message, MessageCompleted, Principal, RunCompleted
 
 
 async def test_echo_streams_events_in_order() -> None:
-    runner = build_runner(Settings(_env_file=None))  # type: ignore[call-arg]
+    runner = build_runner(Settings(_env_file=None), FakeLLM())  # type: ignore[call-arg]
     req = AgentRequest(
         run_id="r1",
         thread_id="t1",

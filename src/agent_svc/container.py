@@ -9,10 +9,10 @@ import structlog
 
 from agent_svc.adapters.infra.postgres import PostgresResource
 from agent_svc.adapters.infra.redis import RedisResource
-from agent_svc.adapters.registries import build_runner
+from agent_svc.adapters.registries import build_llm, build_runner
 from agent_svc.config.settings import Settings
 from agent_svc.domain.exceptions import UnavailableError
-from agent_svc.domain.ports import AgentRunner, HealthCheck, ReadinessReport, Resource
+from agent_svc.domain.ports import AgentRunner, HealthCheck, LLMClient, ReadinessReport, Resource
 
 log = structlog.get_logger()
 
@@ -25,6 +25,7 @@ class Container:
         self.resources: list[Resource] = []
         self.checks: list[HealthCheck] = []
         self.runner: AgentRunner | None = None
+        self.llm: LLMClient | None = None
         self._extra = extra_resources or []
         self._started: list[Resource] = []
 
@@ -54,7 +55,8 @@ class Container:
             self._started.append(res)
             log.info("resource_started", resource=res.name)
 
-        self.runner = build_runner(s)
+        self.llm = build_llm(s)
+        self.runner = build_runner(s, self.llm)
         log.info("container_ready", orchestrator=s.orchestrator.provider)
 
     async def stop(self) -> None:

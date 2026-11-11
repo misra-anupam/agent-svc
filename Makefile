@@ -1,6 +1,6 @@
 .PHONY: install check lint types arch test run up docs
 install:
-	uv sync --group dev
+	uv sync --group dev --extra litellm --extra langgraph
 lint:
 	uv run ruff check . && uv run ruff format --check .
 types:

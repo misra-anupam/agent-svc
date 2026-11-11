@@ -11,7 +11,7 @@ from agent_svc.domain.ports.lifecycle import (
     ReadinessReport,
     Resource,
 )
-from agent_svc.domain.ports.llm import LLMClient, LLMResponse
+from agent_svc.domain.ports.llm import LLMChunk, LLMClient, LLMResponse
 from agent_svc.domain.ports.memory import LongTermMemory, ThreadMemory, UserMemory
 from agent_svc.domain.ports.prompts import PromptStore, PromptVersion
 from agent_svc.domain.ports.ratelimit import RateLimiter, TokenBudget
@@ -29,6 +29,7 @@ __all__ = [
     "GuardrailResult",
     "GuardrailStage",
     "HealthCheck",
+    "LLMChunk",
     "LLMClient",
     "LLMResponse",
     "LongTermMemory",

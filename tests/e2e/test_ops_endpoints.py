@@ -66,12 +66,17 @@ async def _noop() -> None:
     return None
 
 
-@pytest.mark.parametrize("provider", ["langgraph"])
+@pytest.mark.parametrize("provider", ["adk"])
 async def test_missing_extra_fails_startup_clearly(settings: Settings, provider: str) -> None:
     from agent_svc.domain.exceptions import ConfigurationError
 
     settings.orchestrator.provider = provider  # type: ignore[assignment]
     app = create_app(settings)
-    with pytest.raises(ConfigurationError, match="uv sync --extra langgraph"):
+    with pytest.raises(ConfigurationError, match="uv sync --extra adk"):
         async with app.router.lifespan_context(app):
             pass
+
+
+async def test_demo_ui_served_outside_production(client: httpx.AsyncClient) -> None:
+    r = await client.get("/ui")
+    assert r.status_code == 200 and "agent-svc demo" in r.text

@@ -15,6 +15,13 @@ class LLMResponse:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True, slots=True)
+class LLMChunk:
+    delta: str = ""
+    usage: Usage | None = None  # set on the final chunk when the provider reports it
+    model: str = ""
+
+
 class LLMClient(Protocol):
     async def complete(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
@@ -22,4 +29,4 @@ class LLMClient(Protocol):
 
     def stream(
         self, messages: Sequence[Message], *, model: str | None = None, **params: Any
-    ) -> AsyncIterator[str]: ...
+    ) -> AsyncIterator[LLMChunk]: ...

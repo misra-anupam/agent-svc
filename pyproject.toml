@@ -18,6 +18,15 @@ dependencies = [
   "pyjwt[crypto]>=2.9",
 ]
 
+[project.optional-dependencies]
+litellm = [
+    "litellm>=1.50",
+]
+langgraph = [
+    "langchain-core>=0.3",
+    "langgraph>=0.2",
+]
+
 # Optional extras (litellm, langgraph, adk, deepagents, maf, crewai, mlflow, langfuse, ...)
 # are added in the phase that implements each adapter, with uv conflict declarations.
 
@@ -44,6 +53,7 @@ packages = ["src/agent_svc"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = ["integration: needs docker services"]
 
 [tool.ruff]
@@ -70,3 +80,7 @@ files = ["src"]
 [[tool.mypy.overrides]]
 module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["agent_svc.adapters.llm.litellm_client"]
+implicit_reexport = true

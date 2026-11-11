@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>agent-svc demo</title>
+<style>
+  :root{--bg:#fff;--fg:#1c1c1e;--muted:#6b7280;--line:#e5e7eb;--user:#e8f0fe;--ok:#15803d;--err:#b91c1c}
+  @media(prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--muted:#9ca3af;--line:#2a2a2a;--user:#1e2a44;--ok:#4ade80;--err:#f87171}}
+  body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;height:100vh}
+  #log{flex:1;overflow:auto;padding:16px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
+  .msg{margin:12px 0;padding:10px 14px;border-radius:10px;white-space:pre-wrap}
+  .user{background:var(--user);margin-left:15%}
+  .assistant{border:1px solid var(--line)}
+  details{margin:6px 0;border-left:2px solid var(--line);padding-left:10px;font-size:13px;color:var(--muted)}
+  details details{margin-left:4px}
+  summary{cursor:pointer}
+  .kind{font-family:ui-monospace,monospace;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-right:6px}
+  .ok{color:var(--ok)}.bad,.error{color:var(--err)}
+  pre{margin:4px 0;white-space:pre-wrap;word-break:break-word;font-size:12px}
+  form{display:flex;gap:8px;padding:12px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
+  input{flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+  button{padding:10px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer}
+  .meta{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="log" aria-live="polite"></div>
+<form id="f"><input id="q" placeholder="Ask something…" autocomplete="off" required><button>Send</button></form>
+<script>
+const log = document.getElementById('log'), thread = 't-' + Math.random().toString(36).slice(2, 10);
+const history = [];
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+document.getElementById('f').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById('q'), text = input.value.trim(); if (!text) return;
+  input.value = '';
+  history.push({role: 'user', content: text});
+  log.append(el('div', 'msg user', text));
+  const box = el('div', 'msg assistant'), steps = el('div'), body = el('div'), meta = el('div', 'meta');
+  box.append(steps, body, meta); log.append(box);
+  const nodes = new Map();   // step_id -> {details, content}
+  let answer = '';
+  const handle = (type, d) => {
+    if (type === 'message.delta') { answer += d.text; body.textContent = answer; }
+    else if (type === 'step.started') {
+      const det = el('details'), sum = el('summary');
+      sum.append(el('span', 'kind', d.kind), document.createTextNode(d.name + ' …'));
+      const pre = el('pre', null, JSON.stringify(d.input, null, 1));
+      det.append(sum, pre);
+      (nodes.get(d.parent_id)?.details || steps).append(det);   // nested + folded by default
+      nodes.set(d.step_id, {details: det, sum, pre});
+    } else if (type === 'step.finished') {
+      const n = nodes.get(d.step_id); if (!n) return;
+      n.sum.lastChild.textContent = n.sum.lastChild.textContent.replace(' …', '') + ` · ${d.duration_ms}ms ` + (d.ok ? '✓' : '✗');
+      n.sum.classList.add(d.ok ? 'ok' : 'bad');
+      n.pre.textContent += '\n→ ' + d.output_summary;
+    } else if (type === 'usage') meta.textContent = `${d.model} · ${d.usage.input_tokens}→${d.usage.output_tokens} tokens`;
+    else if (type === 'message.completed') { answer = d.text; body.textContent = answer; history.push({role: 'assistant', content: answer}); }
+    else if (type === 'run.error') body.append(el('div', 'error', `[${d.code}] ${d.message}`));
+  };
+  try {
+    const res = await fetch(`/v1/threads/${thread}/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({messages: history})});
+    if (!res.ok) { const p = await res.json().catch(() => ({})); body.append(el('div', 'error', `${res.status} ${p.title || ''} ${p.detail || ''}`)); return; }
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = '';
+    for (;;) {
+      const {value, done} = await reader.read(); if (done) break;
+      buf += value;
+      let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, i); buf = buf.slice(i + 2);
+        const f = Object.fromEntries(block.split('\n').filter(l => l.includes(': ') && !l.startsWith(':')).map(l => [l.slice(0, l.indexOf(': ')), l.slice(l.indexOf(': ') + 2)]));
+        if (f.event) handle(f.event, JSON.parse(f.data));
+      }
+      log.scrollTop = log.scrollHeight;
+    }
+  } catch (e) { body.append(el('div', 'error', String(e))); }
+});
+</script>
+</body>
+</html>
