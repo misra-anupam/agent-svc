@@ -1,6 +1,6 @@
 COMPOSE ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo docker-compose)
 PROFILES ?=
-.PHONY: test-integration install check lint types arch test run up docs
+.PHONY: test-integration install check lint types arch test run up docs docs-build docs-api new-adapter eval
 install:
 	uv sync --group dev --extra litellm --extra langgraph --extra otel --extra langfuse --extra mlflow
 lint:
@@ -23,3 +23,9 @@ up:
 	$(COMPOSE) -f docker/compose.yaml $(PROFILES) up --build
 docs:
 	uv run mkdocs serve
+docs-api:
+	uv run python scripts/gen_openapi.py
+docs-build: docs-api
+	uv run mkdocs build --strict
+new-adapter:
+	uv run python scripts/new_adapter.py $(PORT) $(NAME)

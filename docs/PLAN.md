@@ -194,3 +194,32 @@ Tasks:
   - **Not verified**: LangSmith prompt store and `langsmith_upload=true` (need an account; stubbed in tests); the MLflow
     LLM judge (`evaluation.judge_model`, needs model credentials); ADK evaluators only get tool names, not arguments.
   - Note: the settings field is `evaluation` (env `AGENT_EVALUATION__*`), the CLI is `agent-svc-eval`.
+- **Phase 8**: done, with the gaps listed below.
+  - **Security**: `docs/security.md` maps every category of OWASP Top 10:2025 (web) and the OWASP LLM Top 10 2025
+    to controls, tests and *stated gaps* (editions verified against top10.owasp.org and genai.owasp.org). Hardening:
+    CSP (exempting `/docs` and `/ui`), COOP/CORP, Permissions-Policy, HSTS in production, docs/OpenAPI/UI disabled in
+    production, strict CORS, and a startup validator that refuses an unsafe production config (auth off, `*` CORS,
+    fail-open guardrails). CI `security` job: bandit (B101 skipped: asserts only narrow types), `pip-audit` (core
+    runtime deps are a hard gate and currently clean; all-extras is informational), Trivy secret/misconfig scan and a
+    CycloneDX SBOM artifact. `pip-audit` on every extra found `filelock` 3.32.7 (13 advisories, via litellm /
+    huggingface-hub) and `chromadb` 1.5.9 (4 advisories, no fix, via crewai): documented, not suppressed.
+  - **Semantic cache** (deferred from Phase 3): `cache.semantic=true` reuses answers to similar questions
+    (cosine >= `semantic_threshold`, default 0.95), partitioned by agent version, scope and prior conversation;
+    embedder outages degrade to normal answering. Off by default. In-process per instance (a pgvector index is the
+    multi-instance upgrade); tested with a stub embedder, so threshold values need tuning against your real embedder.
+  - **Docs**: mkdocs-material site (architecture, presets/profiles, add-an-adapter, evals, runbook, 3 ADRs, security,
+    generated API reference); `make docs-build` runs `mkdocs build --strict` cleanly; CI checks the API page is
+    current. `make new-adapter PORT=guardrails NAME=acme` scaffolds an adapter stub.
+  - **Compose smoke (run for real)**: built the image and booted api + redis + postgres: `/readyz` reported redis and
+    postgres, hardening headers present, guardrail steps in the SSE stream, an injection ended in `run.error`
+    `policy_violation`. With the enterprise preset (JWT, Redis limits/cache/memory, Postgres): 401 without or with a
+    bad token, a full run with a valid token, 404 on another user's thread. Observability profiles were verified in
+    Phase 4.
+  - **Not done / not verified**:
+    - The named, versioned **agent registry** (`agents/<name>@N`) and the `/v2` stub from the plan were never built
+      (decided with the user to leave it).
+    - Trivy is configured in CI but has not been run locally (not installed); the CI jobs themselves have not run on
+      GitHub yet.
+    - `mcp-demo`, `guardrails`, `guardrails-gpu` profiles were validated with `compose config` only.
+    - No soak test was run; `tests/load/limits_smoke.py` (Phase 3) is the only load script.
+    - LangSmith (live), the MLflow LLM judge, and the real Prompt Guard / Llama Guard / NeMo sidecars were not exercised.

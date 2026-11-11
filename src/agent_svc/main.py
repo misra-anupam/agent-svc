@@ -47,6 +47,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs" if settings.app.environment != "production" else None,
+        openapi_url="/openapi.json" if settings.app.environment != "production" else None,
         redoc_url=None,
     )
     app.state.settings = settings
@@ -59,7 +60,11 @@ def create_app(settings: Settings | None = None, container: Container | None = N
             allow_methods=["GET", "POST", "DELETE"],
             allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Last-Event-ID"],
         )
-    app.add_middleware(RequestContextMiddleware, agent_version=settings.app.agent_version)
+    app.add_middleware(
+        RequestContextMiddleware,
+        agent_version=settings.app.agent_version,
+        hsts=settings.app.environment == "production",
+    )
     install_error_handlers(app)
 
     app.include_router(health.router)

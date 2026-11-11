@@ -1,0 +1,28 @@
+site_name: agent-svc
+site_description: Composable, async agent-as-a-microservice template
+docs_dir: docs
+strict: true
+theme:
+  name: material
+  features: [navigation.sections, content.code.copy]
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Configuration & presets: how-to/presets.md
+  - How-to:
+      - Add an adapter: how-to/add-adapter.md
+      - Golden dataset & evals: how-to/evals.md
+  - Operations:
+      - Runbook: ops/runbook.md
+  - Security: security.md
+  - API reference: api.md
+  - Decisions:
+      - "0001 Hexagonal architecture": adrs/0001-hexagonal.md
+      - "0002 Bridge frameworks to the LLM port": adrs/0002-llm-port-bridges.md
+      - "0003 Guardrails fail closed": adrs/0003-guardrails-fail-closed.md
+  - Project plan & status: PLAN.md

@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging", "production"]
@@ -191,6 +191,11 @@ class CacheSettings(BaseModel):
     ttl_seconds: int = 3_600
     scope: Literal["user", "tenant", "global"] = "user"  # who may share a cached answer
     max_entries: int = 1_000  # inmemory only
+    # Semantic cache: also reuse answers to *similar* questions (embedding cosine >= threshold).
+    # Off by default: similar is not identical, so keep the threshold high. In-process index.
+    semantic: bool = False
+    semantic_threshold: float = 0.95
+    semantic_max_entries: int = 500
 
 
 class TierLimit(BaseModel):
@@ -273,6 +278,22 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     tools: ToolsSettings = Field(default_factory=ToolsSettings)
     mcp: McpSettings = Field(default_factory=McpSettings)
+
+    @model_validator(mode="after")
+    def _production_must_be_safe(self) -> Settings:
+        """Refuse to start in production with settings that silently remove protection."""
+        if self.app.environment != "production":
+            return self
+        problems = []
+        if not self.auth.enabled:
+            problems.append("auth.enabled must be true")
+        if "*" in self.app.cors_origins:
+            problems.append("app.cors_origins must list explicit origins, not '*'")
+        if self.guardrails.enabled and self.guardrails.fail_mode == "open":
+            problems.append("guardrails.fail_mode must be 'closed'")
+        if problems:
+            raise ValueError("unsafe production configuration: " + "; ".join(problems))
+        return self
 
 
 @lru_cache

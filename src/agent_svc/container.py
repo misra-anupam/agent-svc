@@ -10,6 +10,7 @@ import structlog
 
 from agent_svc.adapters import registries as reg
 from agent_svc.adapters.cache.cached_runner import CachedRunner
+from agent_svc.adapters.cache.semantic import SemanticIndex
 from agent_svc.adapters.cache.stores import InMemoryCache, RedisCache
 from agent_svc.adapters.guardrails.guarded_runner import GuardedRunner
 from agent_svc.adapters.infra import Infra
@@ -148,7 +149,18 @@ class Container:
             self._guard_policy = reg.build_guardrail_policy(s)
             runner = GuardedRunner(runner, self._guard_policy, s.guardrails)
         if s.cache.provider != "none":
-            runner = CachedRunner(runner, reg.caches.create(s.cache.provider, s, infra), s.cache)
+            semantic = (
+                SemanticIndex(
+                    reg.embedders.create(s.memory.embedding_provider, s),
+                    threshold=s.cache.semantic_threshold,
+                    max_entries=s.cache.semantic_max_entries,
+                )
+                if s.cache.semantic
+                else None
+            )
+            runner = CachedRunner(
+                runner, reg.caches.create(s.cache.provider, s, infra), s.cache, semantic
+            )
         self.tracer = reg.tracers.create(s.tracing.provider, s)
         self.runner = TracedRunner(runner, self.tracer, s.tracing)  # outermost: sees cache hits too
 

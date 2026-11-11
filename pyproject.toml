@@ -87,7 +87,14 @@ dev = [
   "import-linter>=2.0",
   "mkdocs-material>=9.5",
   "testcontainers>=4.15.0",
+  "bandit>=1.7",
+  "pip-audit>=2.7",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+# B101: asserts are only used to narrow Optional types for mypy, never for validation or auth.
+skips = ["B101"]
 
 [build-system]
 requires = ["hatchling"]

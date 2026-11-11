@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 
 import structlog
 
+from agent_svc.adapters.cache.semantic import SemanticIndex
 from agent_svc.config.settings import CacheSettings
 from agent_svc.domain.models import (
     AgentEvent,
@@ -40,9 +41,27 @@ def cache_key(req: AgentRequest, scope: str) -> str:
     return hashlib.sha256(material.encode()).hexdigest()
 
 
+def semantic_partition(req: AgentRequest, scope: str) -> str:
+    """Agent version + scope + earlier conversation: the only place a similar hit may come from."""
+    owner = {"user": req.principal.subject, "tenant": req.principal.tenant, "global": ""}[scope]
+    history = [(m.role, m.content) for m in req.messages[:-1]]
+    material = json.dumps(
+        [req.agent_name, req.agent_version, req.principal.tenant, owner, history],
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
 class CachedRunner:
-    def __init__(self, inner: AgentRunner, cache: Cache, settings: CacheSettings) -> None:
+    def __init__(
+        self,
+        inner: AgentRunner,
+        cache: Cache,
+        settings: CacheSettings,
+        semantic: SemanticIndex | None = None,
+    ) -> None:
         self._inner, self._cache, self._s = inner, cache, settings
+        self._semantic = semantic
         self._inflight: dict[str, asyncio.Future[bytes | None]] = {}
 
     def _bypass(self, req: AgentRequest) -> bool:
@@ -62,6 +81,15 @@ class CachedRunner:
             for ev in self._replay(request, hit):
                 yield ev
             return
+
+        partition = semantic_partition(request, self._s.scope) if self._semantic else ""
+        if self._semantic is not None:
+            similar = await self._semantic_lookup(partition, request.last_user_text)
+            if similar is not None:
+                CACHE_REQUESTS.labels("semantic_hit").inc()
+                for ev in self._replay(request, similar):
+                    yield ev
+                return
 
         # single-flight: identical concurrent requests wait for the leader instead of all paying
         existing = self._inflight.get(key)
@@ -94,10 +122,28 @@ class CachedRunner:
                     {"text": text, "in": usage.input_tokens, "out": usage.output_tokens}
                 ).encode()
                 await self._cache.set(key, payload, self._s.ttl_seconds)
+                if self._semantic is not None:
+                    await self._semantic_add(partition, request.last_user_text, key)
             if fut is not None:
                 self._inflight.pop(key, None)
                 if not fut.done():
                     fut.set_result(payload)
+
+    async def _semantic_lookup(self, partition: str, text: str) -> bytes | None:
+        assert self._semantic is not None
+        try:
+            key = await self._semantic.find(partition, text)
+            return await self._cache.get(key) if key else None
+        except Exception:  # an embedder/cache outage must never break answering
+            log.warning("semantic_lookup_failed", exc_info=True)
+            return None
+
+    async def _semantic_add(self, partition: str, text: str, key: str) -> None:
+        assert self._semantic is not None
+        try:
+            await self._semantic.add(partition, text, key)
+        except Exception:
+            log.warning("semantic_index_failed", exc_info=True)
 
     async def _lookup(self, key: str) -> bytes | None:
         try:

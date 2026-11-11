@@ -30,3 +30,40 @@ jobs:
       - run: uv run pytest tests/contract/test_orchestrator_contract.py -q
         env:
           CONTRACT_PROVIDERS: ${{ matrix.provider }}
+
+  security:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev
+      - name: bandit (static analysis of src/)
+        run: uv run bandit -q -r src -c pyproject.toml
+      - name: pip-audit, core runtime dependencies (gate)
+        run: |
+          uv export --no-hashes --no-dev | grep -v '^-e' > requirements-core.txt
+          uv run pip-audit -r requirements-core.txt --no-deps --disable-pip
+      - name: pip-audit, every extra (informational)
+        continue-on-error: true  # transitive findings in optional SDKs; see docs/security.md
+        run: |
+          uv export --no-hashes --all-extras | grep -v '^-e' > requirements-all.txt
+          uv run pip-audit -r requirements-all.txt --no-deps --disable-pip
+      - name: trivy, secrets and misconfiguration (gate)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: {scan-type: fs, scanners: "secret,misconfig", severity: "HIGH,CRITICAL", exit-code: "1"}
+      - name: SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: {scan-type: fs, format: cyclonedx, output: sbom.cdx.json}
+      - uses: actions/upload-artifact@v4
+        with: {name: sbom, path: sbom.cdx.json}
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev
+      - name: API reference is up to date
+        run: uv run python scripts/gen_openapi.py --check || (echo "run: make docs-api" && exit 1)
+      - run: uv run mkdocs build --strict
